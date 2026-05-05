@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import json
+from datetime import datetime
 
 st.set_page_config(
     page_title="Cluster Analytics",
@@ -325,6 +327,25 @@ def base_layout(legend=False):
 
 BAND_LOWER = {'< 0.7': 0.0, '0.7–0.8': 0.7, '0.8–0.9': 0.8, '0.9–1.0': 0.9}
 
+ATHENA_QUERY = """\
+SELECT
+    cc.cluster_id,
+    'https://cluster-tracker-ui.prod.kobaltmusic.com/work_mapping?id=' || cc.cluster_id AS cluster_link,
+    MAX(cs.cluster_state) AS current_cluster_status,
+    MAX(cc.createcluster) AS created_date,
+    MAX(cc.terminatingevent) AS terminated_date,
+    -- Takes the highest score found in the cluster and rounds it
+    ROUND(MAX(ws.work_score_percentile), 2) AS cluster_max_work_score
+FROM cmdq_kobalt_prod.wk_cluster_conversion cc
+JOIN cmdq_kobalt_prod.cluster_summary cs ON cc.cluster_id = cs.cluster_id
+LEFT JOIN repertoire_kobalt_prod.work_score_current ws ON cs.cluster_item = ws.work_id
+GROUP BY
+    cc.cluster_id,
+    cc.createcluster,
+    cc.terminatingevent
+ORDER BY cluster_max_work_score DESC;\
+"""
+
 COLUMN_ALIASES = {
     'created_date':            'createcluster',
     'terminated_date':         'terminatingevent',
@@ -418,6 +439,36 @@ def section_label(text):
     )
 
 
+def build_insights_csv(d, threshold):
+    lines = [
+        "# Cluster Analytics — Insights snapshot",
+        f"# Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC",
+        f"# Value threshold: {threshold:.2f}",
+        "",
+        "## Summary",
+        "Metric,Value",
+        f"Clusters created (Jan 2026+),{d['total_created']}",
+        f"Closed clusters,{d['total_closed']}",
+        f"Open backlog (SuspectedDuplicates),{d['total_backlog']}",
+        f"Valuable backlog (score >= {threshold:.2f}),{d['valuable_backlog']}",
+        "",
+        "## Monthly totals",
+        "Month,Created,Closed",
+    ]
+    for _, row in d['monthly_totals'].iterrows():
+        lines.append(f"{row['month_str']},{row['created']},{row['closed']}")
+    lines += [
+        "",
+        "## Backlog score distribution (SuspectedDuplicates)",
+        "Score band,Clusters,% of backlog",
+    ]
+    total = d['total_backlog']
+    for band, count in d['band_counts'].items():
+        pct = f"{count / total * 100:.1f}%" if total else "—"
+        lines.append(f"{band},{count},{pct}")
+    return "\n".join(lines)
+
+
 def render_dashboard(df):
     # ── Header + threshold control ────────────────────────────────────────────
     hcol, scol = st.columns([3, 1])
@@ -437,6 +488,8 @@ def render_dashboard(df):
         )
 
     d = analyse(df, threshold)
+    st.session_state.last_insights = build_insights_csv(d, threshold)
+    st.session_state.last_insights_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
     # ── Metrics ───────────────────────────────────────────────────────────────
     st.markdown(f"""
@@ -589,6 +642,8 @@ if 'df' not in st.session_state:
     _, col, _ = st.columns([1, 2, 1])
     with col:
         uploaded = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+        with st.expander("Get data from Athena"):
+            st.code(ATHENA_QUERY, language="sql")
     if uploaded:
         try:
             df = pd.read_csv(uploaded)
@@ -603,6 +658,17 @@ if 'df' not in st.session_state:
             st.error(f"Could not process file: {e}")
 else:
     render_dashboard(st.session_state.df)
-    if st.button("↑ Upload a different file", type="tertiary"):
-        del st.session_state.df
-        st.rerun()
+    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+    dl_col, _, switch_col = st.columns([2, 6, 2])
+    with dl_col:
+        if 'last_insights' in st.session_state:
+            st.download_button(
+                label="Download insights",
+                data=st.session_state.last_insights,
+                file_name=f"cluster_insights_{datetime.utcnow().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+            )
+    with switch_col:
+        if st.button("↑ Upload a different file", type="tertiary"):
+            del st.session_state.df
+            st.rerun()
