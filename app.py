@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 st.set_page_config(
     page_title="Cluster Analytics",
@@ -11,190 +10,297 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'DM Sans', sans-serif;
+        font-family: 'Inter', sans-serif;
     }
-    .main { background: #0f0f11; }
-    .block-container { padding: 2rem 3rem; max-width: 1400px; }
 
-    .header-block {
-        margin-bottom: 2.5rem;
-        padding-bottom: 1.5rem;
-        border-bottom: 1px solid #222;
+    /* ── Page chrome ── */
+    .main { background: #09090b; }
+    .block-container {
+        padding: 2.5rem 3.5rem;
+        max-width: 1320px;
     }
-    .header-block h1 {
-        font-size: 1.75rem;
+
+    /* ── Header ── */
+    .page-header {
+        display: flex;
+        align-items: baseline;
+        gap: 1.25rem;
+        margin-bottom: 3rem;
+    }
+    .page-header h1 {
+        font-size: 1.5rem;
         font-weight: 600;
-        color: #f0f0f0;
-        margin: 0 0 0.25rem;
-        letter-spacing: -0.02em;
-    }
-    .header-block p {
-        color: #666;
-        font-size: 0.875rem;
+        color: #fafafa;
         margin: 0;
+        letter-spacing: -0.025em;
     }
+    .page-header .subtitle {
+        font-size: 0.8rem;
+        color: #3f3f46;
+        letter-spacing: 0.01em;
+    }
+    .page-header .dot { color: #27272a; margin: 0 0.25rem; }
 
+    /* ── Metric cards ── */
     .metric-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 1rem;
-        margin-bottom: 2.5rem;
+        gap: 1px;
+        background: #18181b;
+        border: 1px solid #18181b;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 3rem;
     }
     .metric-card {
-        background: #17171a;
-        border: 1px solid #222;
-        border-radius: 10px;
-        padding: 1.25rem 1.5rem;
+        background: #09090b;
+        padding: 1.5rem 1.75rem;
+        position: relative;
     }
+    .metric-card::after {
+        content: '';
+        position: absolute;
+        top: 20%;
+        right: 0;
+        height: 60%;
+        width: 1px;
+        background: #18181b;
+    }
+    .metric-card:last-child::after { display: none; }
     .metric-card .label {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 500;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #555;
-        margin-bottom: 0.5rem;
+        color: #3f3f46;
+        margin-bottom: 0.75rem;
     }
     .metric-card .value {
-        font-size: 2rem;
+        font-size: 2.25rem;
         font-weight: 600;
-        color: #f0f0f0;
-        letter-spacing: -0.03em;
+        color: #e4e4e7;
+        letter-spacing: -0.04em;
         line-height: 1;
-        font-family: 'DM Mono', monospace;
+        font-family: 'JetBrains Mono', monospace;
     }
     .metric-card .sub {
-        font-size: 0.75rem;
-        color: #444;
-        margin-top: 0.4rem;
+        font-size: 0.72rem;
+        color: #3f3f46;
+        margin-top: 0.5rem;
+        letter-spacing: 0.01em;
     }
-    .metric-card.highlight {
-        border-color: #2a3a2a;
-        background: #141a14;
-    }
-    .metric-card.highlight .value { color: #6fcf7a; }
+    .metric-card.highlight .value { color: #4ade80; }
+    .metric-card.highlight .label { color: #166534; }
+    .metric-card.highlight { background: #052e16; }
 
-    .section-header {
-        font-size: 0.7rem;
+    /* ── Section labels ── */
+    .section-label {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.875rem;
+    }
+    .section-label span {
+        font-size: 0.68rem;
         font-weight: 500;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #555;
-        margin: 0 0 1rem;
+        color: #3f3f46;
+    }
+    .section-label::before {
+        content: '';
+        display: block;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: #3f3f46;
+        flex-shrink: 0;
     }
 
+    /* ── Chart cards ── */
+    .chart-card {
+        background: #0d0d10;
+        border: 1px solid #18181b;
+        border-radius: 12px;
+        padding: 1.5rem 1.5rem 0.75rem;
+        overflow: hidden;
+    }
+
+    /* ── Table ── */
+    .tbl-card {
+        background: #0d0d10;
+        border: 1px solid #18181b;
+        border-radius: 12px;
+        overflow: hidden;
+    }
     .backlog-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.875rem;
     }
     .backlog-table th {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 500;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #555;
+        color: #3f3f46;
         text-align: left;
-        padding: 0.5rem 1rem;
-        border-bottom: 1px solid #222;
+        padding: 0.875rem 1.5rem;
+        border-bottom: 1px solid #18181b;
     }
     .backlog-table th:not(:first-child) { text-align: right; }
     .backlog-table td {
-        padding: 0.65rem 1rem;
-        color: #ccc;
-        border-bottom: 1px solid #1a1a1d;
-        font-family: 'DM Mono', monospace;
-        font-size: 0.825rem;
+        padding: 0.75rem 1.5rem;
+        color: #71717a;
+        border-bottom: 1px solid #111113;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
     }
     .backlog-table td:first-child {
-        font-family: 'DM Sans', sans-serif;
-        color: #888;
+        font-family: 'Inter', sans-serif;
+        color: #52525b;
+        font-size: 0.85rem;
     }
     .backlog-table td:not(:first-child) { text-align: right; }
-    .backlog-table tr:last-child td {
+    .backlog-table tbody tr:last-child td {
         border-bottom: none;
-        color: #f0f0f0;
+        color: #e4e4e7;
         font-weight: 500;
-        border-top: 1px solid #222;
+        border-top: 1px solid #18181b;
+        background: #0a0a0d;
     }
-    .backlog-table tr:last-child td:first-child { font-family: 'DM Sans', sans-serif; }
+    .backlog-table tbody tr:last-child td:first-child {
+        font-family: 'Inter', sans-serif;
+    }
+    .backlog-table tbody tr:hover td { background: #0f0f12; }
+    .backlog-table tbody tr:last-child:hover td { background: #0a0a0d; }
+
+    /* ── Progress bar inside table ── */
+    .pct-bar-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.6rem;
+    }
+    .pct-bar {
+        height: 3px;
+        border-radius: 2px;
+        background: #1d4ed8;
+        min-width: 2px;
+    }
+    .pct-bar.green { background: #15803d; }
+
+    /* ── Valuable tag ── */
     .val-tag {
         display: inline-block;
-        background: #1a2e1a;
-        color: #6fcf7a;
-        font-size: 0.65rem;
+        background: #052e16;
+        color: #4ade80;
+        font-size: 0.6rem;
         font-weight: 500;
-        letter-spacing: 0.04em;
-        padding: 2px 7px;
-        border-radius: 20px;
-        margin-left: 6px;
-        font-family: 'DM Sans', sans-serif;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 8px;
+        font-family: 'Inter', sans-serif;
         vertical-align: middle;
     }
 
-    .upload-area {
-        background: #17171a;
-        border: 1px dashed #333;
-        border-radius: 12px;
-        padding: 3rem 2rem;
-        text-align: center;
-        margin: 3rem auto;
-        max-width: 500px;
+    /* ── Upload screen ── */
+    .upload-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 70vh;
     }
-    .upload-area h2 { color: #f0f0f0; font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem; }
-    .upload-area p { color: #555; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .upload-icon {
+        width: 48px;
+        height: 48px;
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    .upload-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #e4e4e7;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.4rem;
+    }
+    .upload-hint {
+        font-size: 0.8rem;
+        color: #3f3f46;
+        margin-bottom: 2rem;
+        text-align: center;
+        line-height: 1.6;
+    }
+    .upload-hint code {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        background: #18181b;
+        border: 1px solid #27272a;
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: #71717a;
+    }
 
+    /* ── Streamlit file uploader overrides ── */
     .stFileUploader > div { background: transparent !important; }
     [data-testid="stFileUploaderDropzone"] {
-        background: #1e1e22 !important;
-        border: 1px solid #2a2a2e !important;
-        border-radius: 8px !important;
+        background: #111114 !important;
+        border: 1px solid #27272a !important;
+        border-radius: 10px !important;
+        transition: border-color 0.15s;
     }
-    [data-testid="stFileUploaderDropzone"]:hover { border-color: #444 !important; }
+    [data-testid="stFileUploaderDropzone"]:hover { border-color: #3f3f46 !important; }
 
-    .chart-section { margin-bottom: 2.5rem; }
-    .chart-container {
-        background: #17171a;
-        border: 1px solid #222;
-        border-radius: 10px;
-        padding: 1.25rem;
-    }
-    .table-container {
-        background: #17171a;
-        border: 1px solid #222;
-        border-radius: 10px;
-        padding: 0.25rem 0;
-        overflow: hidden;
-    }
+    /* ── Divider spacer ── */
+    .spacer { height: 2rem; }
+    .spacer-sm { height: 1.25rem; }
+
     .stPlotlyChart { border-radius: 8px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-PLOT_BG = "#17171a"
-GRID_COLOR = "#222"
-TEXT_COLOR = "#888"
-BLUE = "#4a90d9"
-GRAY = "#5a5a60"
-GREEN = "#6fcf7a"
+BG_CARD  = "#0d0d10"
+GRID     = "#1c1c1f"
+TEXT_DIM = "#3f3f46"
+BLUE     = "#3b82f6"
+BLUE_MID = "#1d4ed8"
+GRAY     = "#27272a"
+GREEN    = "#4ade80"
 
-def make_fig():
+
+def base_layout():
     return dict(
-        paper_bgcolor=PLOT_BG,
-        plot_bgcolor=PLOT_BG,
-        font=dict(family="DM Sans, sans-serif", color=TEXT_COLOR, size=11),
-        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor=BG_CARD,
+        plot_bgcolor=BG_CARD,
+        font=dict(family="Inter, sans-serif", color=TEXT_DIM, size=11),
+        margin=dict(l=4, r=4, t=4, b=4),
         showlegend=False,
+        hoverlabel=dict(
+            bgcolor="#18181b",
+            bordercolor="#27272a",
+            font=dict(family="Inter, sans-serif", size=12, color="#e4e4e7"),
+        ),
     )
+
 
 def analyse(df):
     clusters = df.drop_duplicates('cluster_id').copy()
-    clusters['createcluster'] = pd.to_datetime(clusters['createcluster'])
+    clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
     clusters['terminatingevent'] = pd.to_datetime(clusters['terminatingevent'])
     clusters = clusters[clusters['createcluster'] >= '2026-01-01'].copy()
     clusters['create_month'] = clusters['createcluster'].dt.to_period('M')
-    clusters['close_month'] = clusters['terminatingevent'].dt.to_period('M')
+    clusters['close_month']  = clusters['terminatingevent'].dt.to_period('M')
 
     monthly_created = clusters.groupby('create_month').size().reset_index(name='created')
     monthly_created['month_str'] = monthly_created['create_month'].dt.strftime('%b')
@@ -209,7 +315,10 @@ def analyse(df):
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
     )
 
-    monthly_closed = closed.groupby(['close_month', 'close_type']).size().unstack(fill_value=0).reset_index()
+    monthly_closed = (
+        closed.groupby(['close_month', 'close_type'])
+        .size().unstack(fill_value=0).reset_index()
+    )
     monthly_closed['month_str'] = monthly_closed['close_month'].dt.strftime('%b')
     for col in ['Merged', 'NoDuplicates']:
         if col not in monthly_closed.columns:
@@ -219,22 +328,26 @@ def analyse(df):
         closed['wk_score_2dp'],
         bins=[0, 0.7, 0.8, 0.9, 1.001],
         labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
-        right=False
+        right=False,
     )
-    closure_by_value = closed.groupby(['value_band', 'close_type']).size().unstack(fill_value=0)
+    closure_by_value = (
+        closed.groupby(['value_band', 'close_type'])
+        .size().unstack(fill_value=0)
+    )
     for col in ['Merged', 'NoDuplicates']:
         if col not in closure_by_value.columns:
             closure_by_value[col] = 0
     closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['NoDuplicates']
 
-    open_statuses = ['SuspectedDuplicates', 'SuspectedDuplicatesRevisited', 'MergeReady', 'HasConflicts', 'WritersMapped']
+    open_statuses = ['SuspectedDuplicates', 'SuspectedDuplicatesRevisited',
+                     'MergeReady', 'HasConflicts', 'WritersMapped']
     backlog = clusters[clusters['current_cluster_status'].isin(open_statuses)].copy()
     total_backlog = len(backlog)
     backlog['band'] = pd.cut(
         backlog['wk_score_2dp'],
         bins=[0, 0.7, 0.8, 0.9, 1.001],
         labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
-        right=False
+        right=False,
     )
     band_counts = backlog['band'].value_counts().sort_index()
 
@@ -249,15 +362,26 @@ def analyse(df):
         band_counts=band_counts,
     )
 
+
+def section_label(text):
+    st.markdown(
+        f'<div class="section-label"><span>{text}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_dashboard(data):
+    d = data
+
+    # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
-    <div class="header-block">
+    <div class="page-header">
         <h1>Cluster Analytics</h1>
-        <p>Jan 2026 onwards &nbsp;·&nbsp; Valuable threshold: score ≥ 0.9</p>
+        <span class="subtitle">Jan 2026 onwards<span class="dot">·</span>Valuable threshold: score ≥ 0.9</span>
     </div>
     """, unsafe_allow_html=True)
 
-    d = data
+    # ── Metrics ───────────────────────────────────────────────────────────────
     st.markdown(f"""
     <div class="metric-row">
         <div class="metric-card">
@@ -283,108 +407,127 @@ def render_dashboard(data):
     </div>
     """, unsafe_allow_html=True)
 
-    # Monthly creation chart
-    st.markdown('<p class="section-header">Monthly cluster creation</p>', unsafe_allow_html=True)
+    # ── Monthly creation ──────────────────────────────────────────────────────
+    section_label("Monthly cluster creation")
     mc = d['monthly_created']
     fig1 = go.Figure()
     fig1.add_trace(go.Bar(
-        x=mc['month_str'], y=mc['created'],
-        marker_color=BLUE, marker_line_width=0,
-        hovertemplate='%{x}: <b>%{y:,}</b><extra></extra>'
+        x=mc['month_str'],
+        y=mc['created'],
+        marker=dict(color=BLUE, line_width=0, cornerradius=4),
+        hovertemplate='<b>%{x}</b>  %{y:,}<extra></extra>',
     ))
     fig1.update_layout(
-        **make_fig(),
-        height=220,
-        xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRID_COLOR),
-        yaxis=dict(gridcolor=GRID_COLOR, tickfont=dict(size=11), tickformat=','),
-        bargap=0.35,
+        **base_layout(),
+        height=200,
+        bargap=0.45,
+        xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
+        yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), tickformat=',', zeroline=False),
     )
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
+    # ── Two-column charts ─────────────────────────────────────────────────────
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        st.markdown('<p class="section-header">Monthly closure rate</p>', unsafe_allow_html=True)
+        section_label("Monthly closure rate")
         mclose = d['monthly_closed']
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(
             x=mclose['month_str'], y=mclose['Merged'],
-            name='Merged', marker_color=BLUE, marker_line_width=0,
-            hovertemplate='%{x} Merged: <b>%{y:,}</b><extra></extra>'
+            name='Merged',
+            marker=dict(color=BLUE, line_width=0, cornerradius=4),
+            hovertemplate='<b>%{x}</b> Merged  %{y:,}<extra></extra>',
         ))
         fig2.add_trace(go.Bar(
             x=mclose['month_str'], y=mclose['NoDuplicates'],
-            name='No duplicates', marker_color=GRAY, marker_line_width=0,
-            hovertemplate='%{x} No duplicates: <b>%{y:,}</b><extra></extra>'
+            name='No duplicates',
+            marker=dict(color=GRAY, line_width=0, cornerradius=4),
+            hovertemplate='<b>%{x}</b> No dup  %{y:,}<extra></extra>',
         ))
         fig2.update_layout(
-            **make_fig(),
-            height=220, barmode='stack', bargap=0.35,
+            **base_layout(),
+            height=210, barmode='stack', bargap=0.45,
             showlegend=True,
             legend=dict(
-                orientation='h', x=0, y=1.15,
-                font=dict(size=11, color=TEXT_COLOR),
-                bgcolor='rgba(0,0,0,0)'
+                orientation='h', x=0, y=1.18,
+                font=dict(size=11, color="#52525b"),
+                bgcolor='rgba(0,0,0,0)',
+                traceorder='normal',
             ),
-            xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRID_COLOR),
-            yaxis=dict(gridcolor=GRID_COLOR, tickfont=dict(size=11)),
+            xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
+            yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<p class="section-header">Closures by score band</p>', unsafe_allow_html=True)
+        section_label("Closures by score band")
         cv = d['closure_by_value']
         fig3 = go.Figure()
         fig3.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['Merged'],
             name='Merged', orientation='h',
-            marker_color=BLUE, marker_line_width=0,
-            hovertemplate='%{y} Merged: <b>%{x:,}</b><extra></extra>'
+            marker=dict(color=BLUE, line_width=0, cornerradius=4),
+            hovertemplate='<b>%{y}</b> Merged  %{x:,}<extra></extra>',
         ))
         fig3.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['NoDuplicates'],
             name='No duplicates', orientation='h',
-            marker_color=GRAY, marker_line_width=0,
-            hovertemplate='%{y} No duplicates: <b>%{x:,}</b><extra></extra>'
+            marker=dict(color=GRAY, line_width=0, cornerradius=4),
+            hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
         ))
         fig3.update_layout(
-            **make_fig(),
-            height=220, barmode='stack', bargap=0.35,
+            **base_layout(),
+            height=210, barmode='stack', bargap=0.45,
             showlegend=True,
             legend=dict(
-                orientation='h', x=0, y=1.15,
-                font=dict(size=11, color=TEXT_COLOR),
-                bgcolor='rgba(0,0,0,0)'
+                orientation='h', x=0, y=1.18,
+                font=dict(size=11, color="#52525b"),
+                bgcolor='rgba(0,0,0,0)',
             ),
-            xaxis=dict(gridcolor=GRID_COLOR, tickfont=dict(size=11)),
-            yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRID_COLOR),
+            xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
+            yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
         )
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
         st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<p class="section-header">Unresolved backlog — score distribution</p>', unsafe_allow_html=True)
+    # ── Backlog table ─────────────────────────────────────────────────────────
+    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+    section_label("Unresolved backlog — score distribution")
 
-    bc = d['band_counts']
+    bc    = d['band_counts']
     total = d['total_backlog']
-    rows = ""
+    rows  = ""
     for band, count in bc.items():
-        pct = f"{count/total*100:.1f}%"
-        tag = '<span class="val-tag">valuable</span>' if band == '0.9–1.0' else ''
-        rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{pct}</td></tr>"
+        pct      = count / total * 100
+        pct_str  = f"{pct:.1f}%"
+        bar_w    = max(2, int(pct * 0.8))
+        is_val   = band == '0.9–1.0'
+        tag      = '<span class="val-tag">valuable</span>' if is_val else ''
+        bar_cls  = 'green' if is_val else ''
+        bar_cell = (
+            f'<div class="pct-bar-wrap">'
+            f'<div class="pct-bar {bar_cls}" style="width:{bar_w}px"></div>'
+            f'{pct_str}</div>'
+        )
+        rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{bar_cell}</td></tr>"
     rows += f"<tr><td>Total</td><td>{total:,}</td><td>100%</td></tr>"
 
     st.markdown(f"""
-    <div class="table-container">
+    <div class="tbl-card">
         <table class="backlog-table">
-            <thead><tr><th>Score band</th><th>Clusters</th><th>% of backlog</th></tr></thead>
+            <thead><tr>
+                <th>Score band</th>
+                <th>Clusters</th>
+                <th style="text-align:right">% of backlog</th>
+            </tr></thead>
             <tbody>{rows}</tbody>
         </table>
     </div>
@@ -396,24 +539,33 @@ def render_dashboard(data):
 uploaded = st.file_uploader(
     "Upload cluster CSV",
     type=["csv"],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
 )
 
 if uploaded is None:
     st.markdown("""
-    <div class="upload-area">
-        <h2>Cluster Analytics</h2>
-        <p>Upload your cluster CSV file to generate the dashboard</p>
+    <div class="upload-wrap">
+        <div class="upload-icon">📊</div>
+        <div class="upload-title">Cluster Analytics</div>
+        <div class="upload-hint">
+            Drop a CSV file with the required columns:<br>
+            <code>cluster_id</code> &nbsp;
+            <code>current_cluster_status</code> &nbsp;
+            <code>createcluster</code> &nbsp;
+            <code>terminatingevent</code> &nbsp;
+            <code>wk_score_2dp</code>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     st.file_uploader("Upload CSV", type=["csv"], key="hidden", label_visibility="collapsed")
 else:
     try:
         df = pd.read_csv(uploaded)
-        required = {'cluster_id', 'current_cluster_status', 'createcluster', 'terminatingevent', 'wk_score_2dp'}
+        required = {'cluster_id', 'current_cluster_status', 'createcluster',
+                    'terminatingevent', 'wk_score_2dp'}
         missing = required - set(df.columns)
         if missing:
-            st.error(f"Missing columns: {', '.join(missing)}")
+            st.error(f"Missing columns: {', '.join(sorted(missing))}")
         else:
             data = analyse(df)
             render_dashboard(data)
