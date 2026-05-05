@@ -273,6 +273,18 @@ st.markdown("""
     [data-testid="stFileUploaderDropzone"] span { color: #a1a1aa !important; font-size: 0.8rem !important; }
     [data-testid="stFileUploaderDropzone"] small { color: #d4d4d8 !important; }
 
+    /* ── Threshold slider ── */
+    .threshold-label {
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #a1a1aa;
+        margin-bottom: 0.25rem;
+    }
+    div[data-testid="stSlider"] { padding-top: 0.25rem; }
+    div[data-testid="stSlider"] label { display: none; }
+
     /* ── Divider spacer ── */
     .spacer { height: 2rem; }
     .spacer-sm { height: 1.25rem; }
@@ -311,6 +323,8 @@ def base_layout(legend=False):
     return layout
 
 
+BAND_LOWER = {'< 0.7': 0.0, '0.7–0.8': 0.7, '0.8–0.9': 0.8, '0.9–1.0': 0.9}
+
 COLUMN_ALIASES = {
     'created_date':            'createcluster',
     'terminated_date':         'terminatingevent',
@@ -325,7 +339,7 @@ def normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns={k: v for k, v in COLUMN_ALIASES.items() if k in df.columns})
 
 
-def analyse(df):
+def analyse(df, threshold=0.90):
     df = normalise_columns(df)
     clusters = df.drop_duplicates('cluster_id').copy()
     clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
@@ -385,7 +399,7 @@ def analyse(df):
         total_created=len(clusters),
         total_closed=len(closed),
         total_backlog=total_backlog,
-        valuable_backlog=int((backlog['wk_score_2dp'] >= 0.9).sum()),
+        valuable_backlog=int((backlog['wk_score_2dp'] >= threshold).sum()),
         monthly_created=monthly_created,
         monthly_closed=monthly_closed,
         closure_by_value=closure_by_value,
@@ -400,16 +414,25 @@ def section_label(text):
     )
 
 
-def render_dashboard(data):
-    d = data
+def render_dashboard(df):
+    # ── Header + threshold control ────────────────────────────────────────────
+    hcol, scol = st.columns([3, 1])
+    with hcol:
+        st.markdown("""
+        <div class="page-header">
+            <h1>Cluster Analytics</h1>
+            <span class="subtitle">Jan 2026 onwards</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with scol:
+        st.markdown('<div class="threshold-label">Value threshold</div>', unsafe_allow_html=True)
+        threshold = st.slider(
+            "Value threshold", min_value=0.70, max_value=0.99,
+            value=0.90, step=0.01, format="%.2f",
+            label_visibility="collapsed",
+        )
 
-    # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div class="page-header">
-        <h1>Cluster Analytics</h1>
-        <span class="subtitle">Jan 2026 onwards<span class="dot">·</span>Valuable threshold: score ≥ 0.9</span>
-    </div>
-    """, unsafe_allow_html=True)
+    d = analyse(df, threshold)
 
     # ── Metrics ───────────────────────────────────────────────────────────────
     st.markdown(f"""
@@ -432,7 +455,7 @@ def render_dashboard(data):
         <div class="metric-card highlight">
             <div class="label">Valuable backlog</div>
             <div class="value">{d['valuable_backlog']:,}</div>
-            <div class="sub">Score ≥ 0.9</div>
+            <div class="sub">Score ≥ {threshold:.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -526,7 +549,7 @@ def render_dashboard(data):
         pct      = count / total * 100
         pct_str  = f"{pct:.1f}%"
         bar_w    = max(2, int(pct * 0.8))
-        is_val   = band == '0.9–1.0'
+        is_val   = BAND_LOWER.get(str(band), 0.0) >= threshold
         tag      = '<span class="val-tag">valuable</span>' if is_val else ''
         bar_cls  = 'green' if is_val else ''
         bar_cell = (
@@ -584,8 +607,7 @@ else:
         if missing:
             st.error(f"Missing columns: {', '.join(sorted(missing))}")
         else:
-            data = analyse(df)
-            render_dashboard(data)
+            render_dashboard(df)
             if st.button("↑ Upload a different file", type="tertiary"):
                 st.session_state.uploaded = None
                 st.rerun()
