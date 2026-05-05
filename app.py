@@ -505,11 +505,12 @@ def render_dashboard(df):
 
     st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-    # ── Closures by score band ────────────────────────────────────────────────
-    section_label("Closures by score band")
-    cv = d['closure_by_value']
-    _, mid, _ = st.columns([1, 2, 1])
-    with mid:
+    # ── Closures by score band + backlog table (side by side) ─────────────────
+    col_chart, col_table = st.columns(2, gap="large")
+
+    with col_chart:
+        section_label("Closures by score band")
+        cv = d['closure_by_value']
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['Merged'],
@@ -525,7 +526,7 @@ def render_dashboard(df):
         ))
         fig2.update_layout(
             **base_layout(legend=True),
-            height=220, barmode='stack', bargap=0.45,
+            height=240, barmode='stack', bargap=0.45,
             xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
             yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
         )
@@ -533,40 +534,38 @@ def render_dashboard(df):
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Backlog table ─────────────────────────────────────────────────────────
-    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-    section_label("Unresolved backlog — score distribution")
+    with col_table:
+        section_label("Unresolved backlog — score distribution")
+        bc    = d['band_counts']
+        total = d['total_backlog']
+        rows  = ""
+        for band, count in bc.items():
+            pct      = count / total * 100
+            pct_str  = f"{pct:.1f}%"
+            bar_w    = max(2, int(pct * 0.8))
+            is_val   = BAND_LOWER.get(str(band), 0.0) >= threshold
+            tag      = '<span class="val-tag">valuable</span>' if is_val else ''
+            bar_cls  = 'green' if is_val else ''
+            bar_cell = (
+                f'<div class="pct-bar-wrap">'
+                f'<div class="pct-bar {bar_cls}" style="width:{bar_w}px"></div>'
+                f'{pct_str}</div>'
+            )
+            rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{bar_cell}</td></tr>"
+        rows += f"<tr><td>Total</td><td>{total:,}</td><td>100%</td></tr>"
 
-    bc    = d['band_counts']
-    total = d['total_backlog']
-    rows  = ""
-    for band, count in bc.items():
-        pct      = count / total * 100
-        pct_str  = f"{pct:.1f}%"
-        bar_w    = max(2, int(pct * 0.8))
-        is_val   = BAND_LOWER.get(str(band), 0.0) >= threshold
-        tag      = '<span class="val-tag">valuable</span>' if is_val else ''
-        bar_cls  = 'green' if is_val else ''
-        bar_cell = (
-            f'<div class="pct-bar-wrap">'
-            f'<div class="pct-bar {bar_cls}" style="width:{bar_w}px"></div>'
-            f'{pct_str}</div>'
-        )
-        rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{bar_cell}</td></tr>"
-    rows += f"<tr><td>Total</td><td>{total:,}</td><td>100%</td></tr>"
-
-    st.markdown(f"""
-    <div class="tbl-card">
-        <table class="backlog-table">
-            <thead><tr>
-                <th>Score band</th>
-                <th>Clusters</th>
-                <th style="text-align:right">% of backlog</th>
-            </tr></thead>
-            <tbody>{rows}</tbody>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="tbl-card">
+            <table class="backlog-table">
+                <thead><tr>
+                    <th>Score band</th>
+                    <th>Clusters</th>
+                    <th style="text-align:right">% of backlog</th>
+                </tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
