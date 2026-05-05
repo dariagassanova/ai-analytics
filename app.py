@@ -20,8 +20,8 @@ st.markdown("""
     .stApp,
     [data-testid="stAppViewContainer"],
     [data-testid="stHeader"],
-    section[data-testid="stSidebar"] { background: #09090b !important; }
-    .main { background: #09090b; }
+    section[data-testid="stSidebar"] { background: #ffffff !important; }
+    .main { background: #ffffff; }
     .block-container {
         padding: 2.5rem 3.5rem;
         max-width: 1320px;
@@ -33,34 +33,36 @@ st.markdown("""
         align-items: baseline;
         gap: 1.25rem;
         margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e4e4e7;
     }
     .page-header h1 {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #fafafa;
+        color: #09090b;
         margin: 0;
         letter-spacing: -0.025em;
     }
     .page-header .subtitle {
         font-size: 0.8rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         letter-spacing: 0.01em;
     }
-    .page-header .dot { color: #27272a; margin: 0 0.25rem; }
+    .page-header .dot { color: #d4d4d8; margin: 0 0.25rem; }
 
     /* ── Metric cards ── */
     .metric-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 1px;
-        background: #18181b;
-        border: 1px solid #18181b;
+        background: #e4e4e7;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         overflow: hidden;
         margin-bottom: 3rem;
     }
     .metric-card {
-        background: #09090b;
+        background: #ffffff;
         padding: 1.5rem 1.75rem;
         position: relative;
     }
@@ -71,7 +73,7 @@ st.markdown("""
         right: 0;
         height: 60%;
         width: 1px;
-        background: #18181b;
+        background: #e4e4e7;
     }
     .metric-card:last-child::after { display: none; }
     .metric-card .label {
@@ -79,26 +81,26 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-bottom: 0.75rem;
     }
     .metric-card .value {
         font-size: 2.25rem;
         font-weight: 600;
-        color: #e4e4e7;
+        color: #09090b;
         letter-spacing: -0.04em;
         line-height: 1;
         font-family: 'JetBrains Mono', monospace;
     }
     .metric-card .sub {
         font-size: 0.72rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-top: 0.5rem;
         letter-spacing: 0.01em;
     }
-    .metric-card.highlight .value { color: #4ade80; }
-    .metric-card.highlight .label { color: #166534; }
-    .metric-card.highlight { background: #052e16; }
+    .metric-card.highlight .value { color: #16a34a; }
+    .metric-card.highlight .label { color: #86efac; }
+    .metric-card.highlight { background: #f0fdf4; }
 
     /* ── Section labels ── */
     .section-label {
@@ -112,7 +114,7 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
     }
     .section-label::before {
         content: '';
@@ -120,14 +122,14 @@ st.markdown("""
         width: 3px;
         height: 3px;
         border-radius: 50%;
-        background: #3f3f46;
+        background: #d4d4d8;
         flex-shrink: 0;
     }
 
     /* ── Chart cards ── */
     .chart-card {
-        background: #0d0d10;
-        border: 1px solid #18181b;
+        background: #fafafa;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         padding: 1.5rem 1.5rem 0.75rem;
         overflow: hidden;
@@ -135,8 +137,8 @@ st.markdown("""
 
     /* ── Table ── */
     .tbl-card {
-        background: #0d0d10;
-        border: 1px solid #18181b;
+        background: #fafafa;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         overflow: hidden;
     }
@@ -149,37 +151,37 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
         text-align: left;
         padding: 0.875rem 1.5rem;
-        border-bottom: 1px solid #18181b;
+        border-bottom: 1px solid #e4e4e7;
     }
     .backlog-table th:not(:first-child) { text-align: right; }
     .backlog-table td {
         padding: 0.75rem 1.5rem;
-        color: #71717a;
-        border-bottom: 1px solid #111113;
+        color: #52525b;
+        border-bottom: 1px solid #f4f4f5;
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.8rem;
     }
     .backlog-table td:first-child {
         font-family: 'Inter', sans-serif;
-        color: #52525b;
+        color: #3f3f46;
         font-size: 0.85rem;
     }
     .backlog-table td:not(:first-child) { text-align: right; }
     .backlog-table tbody tr:last-child td {
         border-bottom: none;
-        color: #e4e4e7;
+        color: #09090b;
         font-weight: 500;
-        border-top: 1px solid #18181b;
-        background: #0a0a0d;
+        border-top: 1px solid #e4e4e7;
+        background: #f4f4f5;
     }
     .backlog-table tbody tr:last-child td:first-child {
         font-family: 'Inter', sans-serif;
     }
-    .backlog-table tbody tr:hover td { background: #0f0f12; }
-    .backlog-table tbody tr:last-child:hover td { background: #0a0a0d; }
+    .backlog-table tbody tr:hover td { background: #f4f4f5; }
+    .backlog-table tbody tr:last-child:hover td { background: #f4f4f5; }
 
     /* ── Progress bar inside table ── */
     .pct-bar-wrap {
@@ -191,16 +193,16 @@ st.markdown("""
     .pct-bar {
         height: 3px;
         border-radius: 2px;
-        background: #1d4ed8;
+        background: #93c5fd;
         min-width: 2px;
     }
-    .pct-bar.green { background: #15803d; }
+    .pct-bar.green { background: #86efac; }
 
     /* ── Valuable tag ── */
     .val-tag {
         display: inline-block;
-        background: #052e16;
-        color: #4ade80;
+        background: #dcfce7;
+        color: #16a34a;
         font-size: 0.6rem;
         font-weight: 500;
         letter-spacing: 0.06em;
@@ -223,8 +225,8 @@ st.markdown("""
     .upload-icon {
         width: 48px;
         height: 48px;
-        background: #18181b;
-        border: 1px solid #27272a;
+        background: #f4f4f5;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         display: flex;
         align-items: center;
@@ -235,13 +237,13 @@ st.markdown("""
     .upload-title {
         font-size: 1.125rem;
         font-weight: 600;
-        color: #e4e4e7;
+        color: #09090b;
         letter-spacing: -0.02em;
         margin-bottom: 0.4rem;
     }
     .upload-hint {
         font-size: 0.8rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-bottom: 2rem;
         text-align: center;
         line-height: 1.6;
@@ -249,27 +251,27 @@ st.markdown("""
     .upload-hint code {
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.75rem;
-        background: #18181b;
-        border: 1px solid #27272a;
+        background: #f4f4f5;
+        border: 1px solid #e4e4e7;
         padding: 1px 5px;
         border-radius: 4px;
-        color: #71717a;
+        color: #52525b;
     }
 
     /* ── Streamlit file uploader overrides ── */
     .stFileUploader > div { background: transparent !important; }
     .stFileUploader label { display: none !important; }
     [data-testid="stFileUploaderDropzone"] {
-        background: #111114 !important;
-        border: 1px solid #27272a !important;
+        background: #fafafa !important;
+        border: 1px solid #e4e4e7 !important;
         border-radius: 12px !important;
         transition: border-color 0.15s;
         padding: 1.5rem !important;
     }
-    [data-testid="stFileUploaderDropzone"]:hover { border-color: #52525b !important; }
+    [data-testid="stFileUploaderDropzone"]:hover { border-color: #a1a1aa !important; }
     [data-testid="stFileUploaderDropzone"] p,
-    [data-testid="stFileUploaderDropzone"] span { color: #52525b !important; font-size: 0.8rem !important; }
-    [data-testid="stFileUploaderDropzone"] small { color: #3f3f46 !important; }
+    [data-testid="stFileUploaderDropzone"] span { color: #a1a1aa !important; font-size: 0.8rem !important; }
+    [data-testid="stFileUploaderDropzone"] small { color: #d4d4d8 !important; }
 
     /* ── Divider spacer ── */
     .spacer { height: 2rem; }
@@ -279,12 +281,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-BG_CARD  = "#0d0d10"
-GRID     = "#1c1c1f"
-TEXT_DIM = "#3f3f46"
+BG_CARD  = "#fafafa"
+GRID     = "#e4e4e7"
+TEXT_DIM = "#a1a1aa"
 BLUE     = "#3b82f6"
-BLUE_MID = "#1d4ed8"
-GRAY     = "#27272a"
+GRAY     = "#d4d4d8"
 GREEN    = "#4ade80"
 
 
@@ -292,19 +293,19 @@ def base_layout(legend=False):
     layout = dict(
         paper_bgcolor=BG_CARD,
         plot_bgcolor=BG_CARD,
-        font=dict(family="Inter, sans-serif", color=TEXT_DIM, size=11),
+        font=dict(family="Inter, sans-serif", color="#71717a", size=11),
         margin=dict(l=4, r=4, t=4, b=4),
         showlegend=legend,
         hoverlabel=dict(
-            bgcolor="#18181b",
-            bordercolor="#27272a",
-            font=dict(family="Inter, sans-serif", size=12, color="#e4e4e7"),
+            bgcolor="#ffffff",
+            bordercolor="#e4e4e7",
+            font=dict(family="Inter, sans-serif", size=12, color="#09090b"),
         ),
     )
     if legend:
         layout['legend'] = dict(
             orientation='h', x=0, y=1.18,
-            font=dict(size=11, color="#52525b"),
+            font=dict(size=11, color="#71717a"),
             bgcolor='rgba(0,0,0,0)',
         )
     return layout
@@ -462,7 +463,7 @@ def render_dashboard(data):
         fig2.add_trace(go.Bar(
             x=mclose['month_str'], y=mclose['NoDuplicates'],
             name='No duplicates',
-            marker=dict(color=GRAY, line_width=0, cornerradius=4),
+            marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
             hovertemplate='<b>%{x}</b> No dup  %{y:,}<extra></extra>',
         ))
         fig2.update_layout(
@@ -488,7 +489,7 @@ def render_dashboard(data):
         fig3.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['NoDuplicates'],
             name='No duplicates', orientation='h',
-            marker=dict(color=GRAY, line_width=0, cornerradius=4),
+            marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
             hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
         ))
         fig3.update_layout(
