@@ -349,7 +349,6 @@ def analyse(df, threshold=0.90):
     clusters['close_month']  = clusters['terminatingevent'].dt.to_period('M')
 
     monthly_created = clusters.groupby('create_month').size().reset_index(name='created')
-    monthly_created['month_str'] = monthly_created['create_month'].dt.strftime('%b')
 
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
     closed = clusters[
@@ -361,14 +360,20 @@ def analyse(df, threshold=0.90):
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
     )
 
-    monthly_closed = (
-        closed.groupby(['close_month', 'close_type'])
-        .size().unstack(fill_value=0).reset_index()
+    # Monthly totals for dual-line chart
+    monthly_closed_agg = closed.groupby('close_month').size().reset_index(name='closed')
+    monthly_totals = (
+        monthly_created.rename(columns={'create_month': 'month'})
+        .merge(
+            monthly_closed_agg.rename(columns={'close_month': 'month'}),
+            on='month', how='outer',
+        )
+        .fillna(0)
+        .sort_values('month')
     )
-    monthly_closed['month_str'] = monthly_closed['close_month'].dt.strftime('%b')
-    for col in ['Merged', 'NoDuplicates']:
-        if col not in monthly_closed.columns:
-            monthly_closed[col] = 0
+    monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b')
+    monthly_totals['created']   = monthly_totals['created'].astype(int)
+    monthly_totals['closed']    = monthly_totals['closed'].astype(int)
 
     closed['value_band'] = pd.cut(
         closed['wk_score_2dp'],
@@ -400,8 +405,7 @@ def analyse(df, threshold=0.90):
         total_closed=len(closed),
         total_backlog=total_backlog,
         valuable_backlog=int((backlog['wk_score_2dp'] >= threshold).sum()),
-        monthly_created=monthly_created,
-        monthly_closed=monthly_closed,
+        monthly_totals=monthly_totals,
         closure_by_value=closure_by_value,
         band_counts=band_counts,
     )
@@ -460,22 +464,40 @@ def render_dashboard(df):
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Monthly creation ──────────────────────────────────────────────────────
-    section_label("Monthly cluster creation")
-    mc = d['monthly_created']
+    # ── Created vs Closed dual-line chart ────────────────────────────────────
+    section_label("Monthly created vs closed")
+    mt = d['monthly_totals']
     fig1 = go.Figure()
-    fig1.add_trace(go.Bar(
-        x=mc['month_str'],
-        y=mc['created'],
-        marker=dict(color=BLUE, line_width=0, cornerradius=4),
-        hovertemplate='<b>%{x}</b>  %{y:,}<extra></extra>',
+    fig1.add_trace(go.Scatter(
+        x=mt['month_str'], y=mt['created'],
+        name='Created',
+        mode='lines+markers',
+        line=dict(color='#3266ad', width=2, shape='spline', smoothing=0.3),
+        marker=dict(color='#3266ad', size=5, symbol='circle'),
+        fill='tozeroy',
+        fillcolor='rgba(50, 102, 173, 0.08)',
+        hovertemplate='Created: <b>%{y:,}</b><extra></extra>',
+    ))
+    fig1.add_trace(go.Scatter(
+        x=mt['month_str'], y=mt['closed'],
+        name='Closed',
+        mode='lines+markers',
+        line=dict(color='#1D9E75', width=2, shape='spline', smoothing=0.3),
+        marker=dict(color='#1D9E75', size=5, symbol='circle'),
+        fill='tozeroy',
+        fillcolor='rgba(29, 158, 117, 0.08)',
+        hovertemplate='Closed: <b>%{y:,}</b><extra></extra>',
     ))
     fig1.update_layout(
-        **base_layout(),
-        height=200,
-        bargap=0.45,
-        xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
-        yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), tickformat=',', zeroline=False),
+        **base_layout(legend=True),
+        height=280,
+        hovermode='x unified',
+        xaxis=dict(
+            showgrid=False, tickfont=dict(size=11), linecolor=GRAY,
+            zeroline=False, tickmode='array',
+            tickvals=mt['month_str'].tolist(), ticktext=mt['month_str'].tolist(),
+        ),
+        yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
     )
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
@@ -483,59 +505,32 @@ def render_dashboard(df):
 
     st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-    # ── Two-column charts ─────────────────────────────────────────────────────
-    col1, col2 = st.columns(2, gap="large")
-
-    with col1:
-        section_label("Monthly closure rate")
-        mclose = d['monthly_closed']
+    # ── Closures by score band ────────────────────────────────────────────────
+    section_label("Closures by score band")
+    cv = d['closure_by_value']
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(
-            x=mclose['month_str'], y=mclose['Merged'],
-            name='Merged',
-            marker=dict(color=BLUE, line_width=0, cornerradius=4),
-            hovertemplate='<b>%{x}</b> Merged  %{y:,}<extra></extra>',
-        ))
-        fig2.add_trace(go.Bar(
-            x=mclose['month_str'], y=mclose['NoDuplicates'],
-            name='No duplicates',
-            marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
-            hovertemplate='<b>%{x}</b> No dup  %{y:,}<extra></extra>',
-        ))
-        fig2.update_layout(
-            **base_layout(legend=True),
-            height=210, barmode='stack', bargap=0.45,
-            xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
-            yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
-        )
-        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col2:
-        section_label("Closures by score band")
-        cv = d['closure_by_value']
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['Merged'],
             name='Merged', orientation='h',
-            marker=dict(color=BLUE, line_width=0, cornerradius=4),
+            marker=dict(color='#3266ad', line_width=0, cornerradius=4),
             hovertemplate='<b>%{y}</b> Merged  %{x:,}<extra></extra>',
         ))
-        fig3.add_trace(go.Bar(
+        fig2.add_trace(go.Bar(
             y=cv.index.astype(str), x=cv['NoDuplicates'],
             name='No duplicates', orientation='h',
             marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
             hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
         ))
-        fig3.update_layout(
+        fig2.update_layout(
             **base_layout(legend=True),
-            height=210, barmode='stack', bargap=0.45,
-            xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
+            height=220, barmode='stack', bargap=0.45,
+            xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
             yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
         )
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Backlog table ─────────────────────────────────────────────────────────
