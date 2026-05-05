@@ -17,6 +17,10 @@ st.markdown("""
     }
 
     /* ── Page chrome ── */
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    section[data-testid="stSidebar"] { background: #09090b !important; }
     .main { background: #09090b; }
     .block-container {
         padding: 2.5rem 3.5rem;
@@ -254,13 +258,18 @@ st.markdown("""
 
     /* ── Streamlit file uploader overrides ── */
     .stFileUploader > div { background: transparent !important; }
+    .stFileUploader label { display: none !important; }
     [data-testid="stFileUploaderDropzone"] {
         background: #111114 !important;
         border: 1px solid #27272a !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         transition: border-color 0.15s;
+        padding: 1.5rem !important;
     }
-    [data-testid="stFileUploaderDropzone"]:hover { border-color: #3f3f46 !important; }
+    [data-testid="stFileUploaderDropzone"]:hover { border-color: #52525b !important; }
+    [data-testid="stFileUploaderDropzone"] p,
+    [data-testid="stFileUploaderDropzone"] span { color: #52525b !important; font-size: 0.8rem !important; }
+    [data-testid="stFileUploaderDropzone"] small { color: #3f3f46 !important; }
 
     /* ── Divider spacer ── */
     .spacer { height: 2rem; }
@@ -279,19 +288,26 @@ GRAY     = "#27272a"
 GREEN    = "#4ade80"
 
 
-def base_layout():
-    return dict(
+def base_layout(legend=False):
+    layout = dict(
         paper_bgcolor=BG_CARD,
         plot_bgcolor=BG_CARD,
         font=dict(family="Inter, sans-serif", color=TEXT_DIM, size=11),
         margin=dict(l=4, r=4, t=4, b=4),
-        showlegend=False,
+        showlegend=legend,
         hoverlabel=dict(
             bgcolor="#18181b",
             bordercolor="#27272a",
             font=dict(family="Inter, sans-serif", size=12, color="#e4e4e7"),
         ),
     )
+    if legend:
+        layout['legend'] = dict(
+            orientation='h', x=0, y=1.18,
+            font=dict(size=11, color="#52525b"),
+            bgcolor='rgba(0,0,0,0)',
+        )
+    return layout
 
 
 def analyse(df):
@@ -450,15 +466,8 @@ def render_dashboard(data):
             hovertemplate='<b>%{x}</b> No dup  %{y:,}<extra></extra>',
         ))
         fig2.update_layout(
-            **base_layout(),
+            **base_layout(legend=True),
             height=210, barmode='stack', bargap=0.45,
-            showlegend=True,
-            legend=dict(
-                orientation='h', x=0, y=1.18,
-                font=dict(size=11, color="#52525b"),
-                bgcolor='rgba(0,0,0,0)',
-                traceorder='normal',
-            ),
             xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
             yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
         )
@@ -483,14 +492,8 @@ def render_dashboard(data):
             hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
         ))
         fig3.update_layout(
-            **base_layout(),
+            **base_layout(legend=True),
             height=210, barmode='stack', bargap=0.45,
-            showlegend=True,
-            legend=dict(
-                orientation='h', x=0, y=1.18,
-                font=dict(size=11, color="#52525b"),
-                bgcolor='rgba(0,0,0,0)',
-            ),
             xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
             yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
         )
@@ -536,13 +539,7 @@ def render_dashboard(data):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-uploaded = st.file_uploader(
-    "Upload cluster CSV",
-    type=["csv"],
-    label_visibility="collapsed",
-)
-
-if uploaded is None:
+if 'uploaded' not in st.session_state or st.session_state.uploaded is None:
     st.markdown("""
     <div class="upload-wrap">
         <div class="upload-icon">📊</div>
@@ -557,8 +554,15 @@ if uploaded is None:
         </div>
     </div>
     """, unsafe_allow_html=True)
-    st.file_uploader("Upload CSV", type=["csv"], key="hidden", label_visibility="collapsed")
+
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        uploaded = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+    if uploaded:
+        st.session_state.uploaded = uploaded
+        st.rerun()
 else:
+    uploaded = st.session_state.uploaded
     try:
         df = pd.read_csv(uploaded)
         required = {'cluster_id', 'current_cluster_status', 'createcluster',
@@ -569,5 +573,11 @@ else:
         else:
             data = analyse(df)
             render_dashboard(data)
+            if st.button("↑ Upload a different file", type="tertiary"):
+                st.session_state.uploaded = None
+                st.rerun()
     except Exception as e:
         st.error(f"Could not process file: {e}")
+        if st.button("↑ Try a different file", type="tertiary"):
+            st.session_state.uploaded = None
+            st.rerun()
