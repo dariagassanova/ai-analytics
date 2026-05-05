@@ -576,7 +576,7 @@ def render_dashboard(df):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if 'uploaded' not in st.session_state or st.session_state.uploaded is None:
+if 'df' not in st.session_state:
     st.markdown("""
     <div class="upload-wrap">
         <div class="upload-icon">📊</div>
@@ -596,23 +596,19 @@ if 'uploaded' not in st.session_state or st.session_state.uploaded is None:
     with col:
         uploaded = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
     if uploaded:
-        st.session_state.uploaded = uploaded
-        st.rerun()
-else:
-    uploaded = st.session_state.uploaded
-    try:
-        df = pd.read_csv(uploaded)
-        df = normalise_columns(df)
-        missing = REQUIRED_COLUMNS - set(df.columns)
-        if missing:
-            st.error(f"Missing columns: {', '.join(sorted(missing))}")
-        else:
-            render_dashboard(df)
-            if st.button("↑ Upload a different file", type="tertiary"):
-                st.session_state.uploaded = None
+        try:
+            df = pd.read_csv(uploaded)
+            df = normalise_columns(df)
+            missing = REQUIRED_COLUMNS - set(df.columns)
+            if missing:
+                st.error(f"Missing columns: {', '.join(sorted(missing))}")
+            else:
+                st.session_state.df = df
                 st.rerun()
-    except Exception as e:
-        st.error(f"Could not process file: {e}")
-        if st.button("↑ Try a different file", type="tertiary"):
-            st.session_state.uploaded = None
-            st.rerun()
+        except Exception as e:
+            st.error(f"Could not process file: {e}")
+else:
+    render_dashboard(st.session_state.df)
+    if st.button("↑ Upload a different file", type="tertiary"):
+        del st.session_state.df
+        st.rerun()
