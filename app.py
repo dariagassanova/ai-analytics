@@ -356,9 +356,7 @@ def analyse(df):
             closure_by_value[col] = 0
     closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['NoDuplicates']
 
-    open_statuses = ['SuspectedDuplicates', 'SuspectedDuplicatesRevisited',
-                     'MergeReady', 'HasConflicts', 'WritersMapped']
-    backlog = clusters[clusters['current_cluster_status'].isin(open_statuses)].copy()
+    backlog = clusters[clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
     total_backlog = len(backlog)
     backlog['band'] = pd.cut(
         backlog['wk_score_2dp'],
@@ -414,7 +412,7 @@ def render_dashboard(data):
         <div class="metric-card">
             <div class="label">Open backlog</div>
             <div class="value">{d['total_backlog']:,}</div>
-            <div class="sub">Suspected duplicates</div>
+            <div class="sub">SuspectedDuplicates only</div>
         </div>
         <div class="metric-card highlight">
             <div class="label">Valuable backlog</div>
