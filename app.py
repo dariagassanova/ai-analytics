@@ -311,7 +311,22 @@ def base_layout(legend=False):
     return layout
 
 
+COLUMN_ALIASES = {
+    'created_date':            'createcluster',
+    'terminated_date':         'terminatingevent',
+    'cluster_max_work_score':  'wk_score_2dp',
+}
+
+REQUIRED_COLUMNS = {'cluster_id', 'current_cluster_status', 'createcluster',
+                    'terminatingevent', 'wk_score_2dp'}
+
+
+def normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
+    return df.rename(columns={k: v for k, v in COLUMN_ALIASES.items() if k in df.columns})
+
+
 def analyse(df):
+    df = normalise_columns(df)
     clusters = df.drop_duplicates('cluster_id').copy()
     clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
     clusters['terminatingevent'] = pd.to_datetime(clusters['terminatingevent'])
@@ -564,9 +579,8 @@ else:
     uploaded = st.session_state.uploaded
     try:
         df = pd.read_csv(uploaded)
-        required = {'cluster_id', 'current_cluster_status', 'createcluster',
-                    'terminatingevent', 'wk_score_2dp'}
-        missing = required - set(df.columns)
+        df = normalise_columns(df)
+        missing = REQUIRED_COLUMNS - set(df.columns)
         if missing:
             st.error(f"Missing columns: {', '.join(sorted(missing))}")
         else:
