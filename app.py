@@ -367,7 +367,7 @@ def normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns={k: v for k, v in COLUMN_ALIASES.items() if k in df.columns})
 
 
-def analyse(df, threshold=0.90):
+def analyse(df, threshold=0.90, month_filter=None):
     df = normalise_columns(df)
     clusters = df.drop_duplicates('cluster_id').copy()
     clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
@@ -376,61 +376,68 @@ def analyse(df, threshold=0.90):
     clusters['create_month'] = clusters['createcluster'].dt.to_period('M')
     clusters['close_month']  = clusters['terminatingevent'].dt.to_period('M')
 
-    monthly_created = clusters.groupby('create_month').size().reset_index(name='created')
-
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
-    closed = clusters[
+    all_closed = clusters[
         clusters['current_cluster_status'].isin(closed_statuses) &
         clusters['terminatingevent'].notna() &
         (clusters['terminatingevent'] >= '2026-01-01')
     ].copy()
-    closed['close_type'] = closed['current_cluster_status'].apply(
+    all_closed['close_type'] = all_closed['current_cluster_status'].apply(
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
     )
 
-    # Monthly totals for dual-line chart
-    monthly_closed_agg = closed.groupby('close_month').size().reset_index(name='closed')
-    monthly_totals = (
-        monthly_created.rename(columns={'create_month': 'month'})
-        .merge(
-            monthly_closed_agg.rename(columns={'close_month': 'month'}),
-            on='month', how='outer',
-        )
-        .fillna(0)
-        .sort_values('month')
-    )
-    monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b')
-    monthly_totals['created']   = monthly_totals['created'].astype(int)
-    monthly_totals['closed']    = monthly_totals['closed'].astype(int)
+    if month_filter is not None:
+        sel        = month_filter                          # pd.Period
+        month_end  = sel.to_timestamp(how='end')          # last instant of month
 
-    closed['value_band'] = pd.cut(
-        closed['wk_score_2dp'],
-        bins=[0, 0.26, 0.51, 0.76, 0.81, 0.91, 1.001],
-        labels=['0–0.25', '0.26–0.50', '0.51–0.75', '0.76–0.80', '0.81–0.90', '0.91–1.0'],
-        right=False,
-    )
-    closure_by_value = (
-        closed.groupby(['value_band', 'close_type'])
-        .size().unstack(fill_value=0)
-    )
+        total_created  = int((clusters['create_month'] == sel).sum())
+        closed         = all_closed[all_closed['close_month'] == sel].copy()
+        total_closed   = len(closed)
+        monthly_totals = None                             # chart replaced by stat row
+
+        # Open as of end-of-month: created before/during month, not yet closed
+        backlog = clusters[
+            (clusters['createcluster'] <= month_end) &
+            (clusters['terminatingevent'].isna() |
+             (clusters['terminatingevent'] > month_end))
+        ].copy()
+    else:
+        total_created = len(clusters)
+        closed        = all_closed.copy()
+        total_closed  = len(closed)
+
+        monthly_created    = clusters.groupby('create_month').size().reset_index(name='created')
+        monthly_closed_agg = closed.groupby('close_month').size().reset_index(name='closed')
+        monthly_totals = (
+            monthly_created.rename(columns={'create_month': 'month'})
+            .merge(monthly_closed_agg.rename(columns={'close_month': 'month'}),
+                   on='month', how='outer')
+            .fillna(0).sort_values('month')
+        )
+        monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b')
+        monthly_totals['created']   = monthly_totals['created'].astype(int)
+        monthly_totals['closed']    = monthly_totals['closed'].astype(int)
+
+        backlog = clusters[clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
+
+    # ── Score band breakdown (shared) ────────────────────────────────────────
+    BINS   = [0, 0.26, 0.51, 0.76, 0.81, 0.91, 1.001]
+    LABELS = ['0–0.25', '0.26–0.50', '0.51–0.75', '0.76–0.80', '0.81–0.90', '0.91–1.0']
+
+    closed['value_band'] = pd.cut(closed['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
+    closure_by_value = closed.groupby(['value_band', 'close_type']).size().unstack(fill_value=0)
     for col in ['Merged', 'NoDuplicates']:
         if col not in closure_by_value.columns:
             closure_by_value[col] = 0
     closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['NoDuplicates']
 
-    backlog = clusters[clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
     total_backlog = len(backlog)
-    backlog['band'] = pd.cut(
-        backlog['wk_score_2dp'],
-        bins=[0, 0.26, 0.51, 0.76, 0.81, 0.91, 1.001],
-        labels=['0–0.25', '0.26–0.50', '0.51–0.75', '0.76–0.80', '0.81–0.90', '0.91–1.0'],
-        right=False,
-    )
+    backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
     band_counts = backlog['band'].value_counts().sort_index()
 
     return dict(
-        total_created=len(clusters),
-        total_closed=len(closed),
+        total_created=total_created,
+        total_closed=total_closed,
         total_backlog=total_backlog,
         valuable_backlog=int((backlog['wk_score_2dp'] >= threshold).sum()),
         monthly_totals=monthly_totals,
@@ -462,8 +469,9 @@ def build_insights_csv(d, threshold):
         "## Monthly totals",
         "Month,Created,Closed",
     ]
-    for _, row in d['monthly_totals'].iterrows():
-        lines.append(f"{row['month_str']},{row['created']},{row['closed']}")
+    if d['monthly_totals'] is not None:
+        for _, row in d['monthly_totals'].iterrows():
+            lines.append(f"{row['month_str']},{row['created']},{row['closed']}")
     lines += [
         "",
         "## Backlog score distribution (SuspectedDuplicates)",
@@ -477,7 +485,14 @@ def build_insights_csv(d, threshold):
 
 
 def render_dashboard(df):
-    # ── Header + threshold control ────────────────────────────────────────────
+    # ── Derive available months from data ─────────────────────────────────────
+    tmp = normalise_columns(df.drop_duplicates('cluster_id').copy())
+    tmp['createcluster'] = pd.to_datetime(tmp['createcluster'])
+    tmp = tmp[tmp['createcluster'] >= '2026-01-01']
+    available_months = sorted(tmp['createcluster'].dt.to_period('M').dropna().unique())
+    month_options    = ['All'] + [m.strftime('%b %Y') for m in available_months]
+
+    # ── Header + controls ─────────────────────────────────────────────────────
     hcol, scol = st.columns([3, 1])
     with hcol:
         st.markdown("""
@@ -494,27 +509,40 @@ def render_dashboard(df):
             label_visibility="collapsed",
         )
 
-    d = analyse(df, threshold)
+    mcol, _ = st.columns([2, 6])
+    with mcol:
+        st.markdown('<div class="threshold-label">Filter by month</div>', unsafe_allow_html=True)
+        selected_label = st.selectbox(
+            "Filter by month", month_options, label_visibility="collapsed",
+        )
+    month_filter = (
+        None if selected_label == 'All'
+        else pd.Period(selected_label, 'M')
+    )
+
+    d = analyse(df, threshold, month_filter)
     st.session_state.last_insights = build_insights_csv(d, threshold)
     st.session_state.last_insights_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
     # ── Metrics ───────────────────────────────────────────────────────────────
+    period_label  = selected_label if month_filter else 'Jan 2026 onwards'
+    backlog_label = f'Open as of end of {selected_label}' if month_filter else 'SuspectedDuplicates only'
     st.markdown(f"""
     <div class="metric-row">
         <div class="metric-card">
             <div class="label">Clusters created</div>
             <div class="value">{d['total_created']:,}</div>
-            <div class="sub">Jan 2026 onwards</div>
+            <div class="sub">{period_label}</div>
         </div>
         <div class="metric-card">
             <div class="label">Closed clusters</div>
             <div class="value">{d['total_closed']:,}</div>
-            <div class="sub">Merged + NoDuplicates</div>
+            <div class="sub">{period_label}</div>
         </div>
         <div class="metric-card">
             <div class="label">Open backlog</div>
             <div class="value">{d['total_backlog']:,}</div>
-            <div class="sub">SuspectedDuplicates only</div>
+            <div class="sub">{backlog_label}</div>
         </div>
         <div class="metric-card highlight">
             <div class="label">Valuable backlog</div>
@@ -524,44 +552,61 @@ def render_dashboard(df):
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Created vs Closed dual-line chart ────────────────────────────────────
-    section_label("Monthly created vs closed")
-    mt = d['monthly_totals']
-    fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(
-        x=mt['month_str'], y=mt['created'],
-        name='Created',
-        mode='lines+markers',
-        line=dict(color='#3266ad', width=2, shape='spline', smoothing=0.3),
-        marker=dict(color='#3266ad', size=5, symbol='circle'),
-        fill='tozeroy',
-        fillcolor='rgba(50, 102, 173, 0.08)',
-        hovertemplate='Created: <b>%{y:,}</b><extra></extra>',
-    ))
-    fig1.add_trace(go.Scatter(
-        x=mt['month_str'], y=mt['closed'],
-        name='Closed',
-        mode='lines+markers',
-        line=dict(color='#1D9E75', width=2, shape='spline', smoothing=0.3),
-        marker=dict(color='#1D9E75', size=5, symbol='circle'),
-        fill='tozeroy',
-        fillcolor='rgba(29, 158, 117, 0.08)',
-        hovertemplate='Closed: <b>%{y:,}</b><extra></extra>',
-    ))
-    fig1.update_layout(
-        **base_layout(legend=True),
-        height=280,
-        hovermode='x unified',
-        xaxis=dict(
-            showgrid=False, tickfont=dict(size=11), linecolor=GRAY,
-            zeroline=False, tickmode='array',
-            tickvals=mt['month_str'].tolist(), ticktext=mt['month_str'].tolist(),
-        ),
-        yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
-    )
-    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
-    st.markdown('</div>', unsafe_allow_html=True)
+    # ── Created vs Closed: line chart (All) or stat row (single month) ───────
+    if month_filter is None:
+        section_label("Monthly created vs closed")
+        mt = d['monthly_totals']
+        fig1 = go.Figure()
+        fig1.add_trace(go.Scatter(
+            x=mt['month_str'], y=mt['created'],
+            name='Created',
+            mode='lines+markers',
+            line=dict(color='#3266ad', width=2, shape='spline', smoothing=0.3),
+            marker=dict(color='#3266ad', size=5, symbol='circle'),
+            fill='tozeroy',
+            fillcolor='rgba(50, 102, 173, 0.08)',
+            hovertemplate='Created: <b>%{y:,}</b><extra></extra>',
+        ))
+        fig1.add_trace(go.Scatter(
+            x=mt['month_str'], y=mt['closed'],
+            name='Closed',
+            mode='lines+markers',
+            line=dict(color='#1D9E75', width=2, shape='spline', smoothing=0.3),
+            marker=dict(color='#1D9E75', size=5, symbol='circle'),
+            fill='tozeroy',
+            fillcolor='rgba(29, 158, 117, 0.08)',
+            hovertemplate='Closed: <b>%{y:,}</b><extra></extra>',
+        ))
+        fig1.update_layout(
+            **base_layout(legend=True),
+            height=280,
+            hovermode='x unified',
+            xaxis=dict(
+                showgrid=False, tickfont=dict(size=11), linecolor=GRAY,
+                zeroline=False, tickmode='array',
+                tickvals=mt['month_str'].tolist(), ticktext=mt['month_str'].tolist(),
+            ),
+            yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
+        )
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+        st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        # Single month: show a compact created/closed stat strip
+        st.markdown(f"""
+        <div class="metric-row" style="margin-bottom:1.5rem">
+            <div class="metric-card" style="border-left:3px solid #3266ad">
+                <div class="label">Created in {selected_label}</div>
+                <div class="value" style="color:#3266ad">{d['total_created']:,}</div>
+            </div>
+            <div class="metric-card" style="border-left:3px solid #1D9E75">
+                <div class="label">Closed in {selected_label}</div>
+                <div class="value" style="color:#1D9E75">{d['total_closed']:,}</div>
+            </div>
+            <div class="metric-card" style="opacity:0;pointer-events:none"></div>
+            <div class="metric-card" style="opacity:0;pointer-events:none"></div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
