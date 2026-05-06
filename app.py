@@ -325,7 +325,7 @@ def base_layout(legend=False):
     return layout
 
 
-BAND_LOWER = {'< 0.7': 0.0, '0.7–0.8': 0.7, '0.8–0.9': 0.8, '0.9–1.0': 0.9}
+BAND_LOWER = {'0–0.25': 0.0, '0.25–0.50': 0.25, '0.50–0.75': 0.50, '0.75–1.0': 0.75}
 
 ATHENA_QUERY = """\
 SELECT
@@ -398,8 +398,8 @@ def analyse(df, threshold=0.90):
 
     closed['value_band'] = pd.cut(
         closed['wk_score_2dp'],
-        bins=[0, 0.7, 0.8, 0.9, 1.001],
-        labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
+        bins=[0, 0.25, 0.50, 0.75, 1.001],
+        labels=['0–0.25', '0.25–0.50', '0.50–0.75', '0.75–1.0'],
         right=False,
     )
     closure_by_value = (
@@ -415,8 +415,8 @@ def analyse(df, threshold=0.90):
     total_backlog = len(backlog)
     backlog['band'] = pd.cut(
         backlog['wk_score_2dp'],
-        bins=[0, 0.7, 0.8, 0.9, 1.001],
-        labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
+        bins=[0, 0.25, 0.50, 0.75, 1.001],
+        labels=['0–0.25', '0.25–0.50', '0.50–0.75', '0.75–1.0'],
         right=False,
     )
     band_counts = backlog['band'].value_counts().sort_index()
