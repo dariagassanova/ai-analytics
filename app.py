@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import json
+from datetime import datetime
 
 st.set_page_config(
     page_title="Cluster Analytics",
@@ -17,7 +19,11 @@ st.markdown("""
     }
 
     /* ── Page chrome ── */
-    .main { background: #09090b; }
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    section[data-testid="stSidebar"] { background: #ffffff !important; }
+    .main { background: #ffffff; }
     .block-container {
         padding: 2.5rem 3.5rem;
         max-width: 1320px;
@@ -29,34 +35,36 @@ st.markdown("""
         align-items: baseline;
         gap: 1.25rem;
         margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e4e4e7;
     }
     .page-header h1 {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #fafafa;
+        color: #09090b;
         margin: 0;
         letter-spacing: -0.025em;
     }
     .page-header .subtitle {
         font-size: 0.8rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         letter-spacing: 0.01em;
     }
-    .page-header .dot { color: #27272a; margin: 0 0.25rem; }
+    .page-header .dot { color: #d4d4d8; margin: 0 0.25rem; }
 
     /* ── Metric cards ── */
     .metric-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 1px;
-        background: #18181b;
-        border: 1px solid #18181b;
+        background: #e4e4e7;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         overflow: hidden;
         margin-bottom: 3rem;
     }
     .metric-card {
-        background: #09090b;
+        background: #ffffff;
         padding: 1.5rem 1.75rem;
         position: relative;
     }
@@ -67,7 +75,7 @@ st.markdown("""
         right: 0;
         height: 60%;
         width: 1px;
-        background: #18181b;
+        background: #e4e4e7;
     }
     .metric-card:last-child::after { display: none; }
     .metric-card .label {
@@ -75,26 +83,26 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-bottom: 0.75rem;
     }
     .metric-card .value {
         font-size: 2.25rem;
         font-weight: 600;
-        color: #e4e4e7;
+        color: #09090b;
         letter-spacing: -0.04em;
         line-height: 1;
         font-family: 'JetBrains Mono', monospace;
     }
     .metric-card .sub {
         font-size: 0.72rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-top: 0.5rem;
         letter-spacing: 0.01em;
     }
-    .metric-card.highlight .value { color: #4ade80; }
-    .metric-card.highlight .label { color: #166534; }
-    .metric-card.highlight { background: #052e16; }
+    .metric-card.highlight .value { color: #16a34a; }
+    .metric-card.highlight .label { color: #86efac; }
+    .metric-card.highlight { background: #f0fdf4; }
 
     /* ── Section labels ── */
     .section-label {
@@ -108,7 +116,7 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
     }
     .section-label::before {
         content: '';
@@ -116,14 +124,14 @@ st.markdown("""
         width: 3px;
         height: 3px;
         border-radius: 50%;
-        background: #3f3f46;
+        background: #d4d4d8;
         flex-shrink: 0;
     }
 
     /* ── Chart cards ── */
     .chart-card {
-        background: #0d0d10;
-        border: 1px solid #18181b;
+        background: #fafafa;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         padding: 1.5rem 1.5rem 0.75rem;
         overflow: hidden;
@@ -131,8 +139,8 @@ st.markdown("""
 
     /* ── Table ── */
     .tbl-card {
-        background: #0d0d10;
-        border: 1px solid #18181b;
+        background: #fafafa;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         overflow: hidden;
     }
@@ -145,37 +153,37 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #3f3f46;
+        color: #a1a1aa;
         text-align: left;
         padding: 0.875rem 1.5rem;
-        border-bottom: 1px solid #18181b;
+        border-bottom: 1px solid #e4e4e7;
     }
     .backlog-table th:not(:first-child) { text-align: right; }
     .backlog-table td {
         padding: 0.75rem 1.5rem;
-        color: #71717a;
-        border-bottom: 1px solid #111113;
+        color: #52525b;
+        border-bottom: 1px solid #f4f4f5;
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.8rem;
     }
     .backlog-table td:first-child {
         font-family: 'Inter', sans-serif;
-        color: #52525b;
+        color: #3f3f46;
         font-size: 0.85rem;
     }
     .backlog-table td:not(:first-child) { text-align: right; }
     .backlog-table tbody tr:last-child td {
         border-bottom: none;
-        color: #e4e4e7;
+        color: #09090b;
         font-weight: 500;
-        border-top: 1px solid #18181b;
-        background: #0a0a0d;
+        border-top: 1px solid #e4e4e7;
+        background: #f4f4f5;
     }
     .backlog-table tbody tr:last-child td:first-child {
         font-family: 'Inter', sans-serif;
     }
-    .backlog-table tbody tr:hover td { background: #0f0f12; }
-    .backlog-table tbody tr:last-child:hover td { background: #0a0a0d; }
+    .backlog-table tbody tr:hover td { background: #f4f4f5; }
+    .backlog-table tbody tr:last-child:hover td { background: #f4f4f5; }
 
     /* ── Progress bar inside table ── */
     .pct-bar-wrap {
@@ -187,16 +195,16 @@ st.markdown("""
     .pct-bar {
         height: 3px;
         border-radius: 2px;
-        background: #1d4ed8;
+        background: #93c5fd;
         min-width: 2px;
     }
-    .pct-bar.green { background: #15803d; }
+    .pct-bar.green { background: #86efac; }
 
     /* ── Valuable tag ── */
     .val-tag {
         display: inline-block;
-        background: #052e16;
-        color: #4ade80;
+        background: #dcfce7;
+        color: #16a34a;
         font-size: 0.6rem;
         font-weight: 500;
         letter-spacing: 0.06em;
@@ -219,8 +227,8 @@ st.markdown("""
     .upload-icon {
         width: 48px;
         height: 48px;
-        background: #18181b;
-        border: 1px solid #27272a;
+        background: #f4f4f5;
+        border: 1px solid #e4e4e7;
         border-radius: 12px;
         display: flex;
         align-items: center;
@@ -231,13 +239,13 @@ st.markdown("""
     .upload-title {
         font-size: 1.125rem;
         font-weight: 600;
-        color: #e4e4e7;
+        color: #09090b;
         letter-spacing: -0.02em;
         margin-bottom: 0.4rem;
     }
     .upload-hint {
         font-size: 0.8rem;
-        color: #3f3f46;
+        color: #a1a1aa;
         margin-bottom: 2rem;
         text-align: center;
         line-height: 1.6;
@@ -245,22 +253,51 @@ st.markdown("""
     .upload-hint code {
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.75rem;
-        background: #18181b;
-        border: 1px solid #27272a;
+        background: #f4f4f5;
+        border: 1px solid #e4e4e7;
         padding: 1px 5px;
         border-radius: 4px;
-        color: #71717a;
+        color: #52525b;
     }
 
     /* ── Streamlit file uploader overrides ── */
     .stFileUploader > div { background: transparent !important; }
+    .stFileUploader label { display: none !important; }
     [data-testid="stFileUploaderDropzone"] {
-        background: #111114 !important;
-        border: 1px solid #27272a !important;
-        border-radius: 10px !important;
+        background: #fafafa !important;
+        border: 1px solid #e4e4e7 !important;
+        border-radius: 12px !important;
         transition: border-color 0.15s;
+        padding: 1.5rem !important;
     }
-    [data-testid="stFileUploaderDropzone"]:hover { border-color: #3f3f46 !important; }
+    [data-testid="stFileUploaderDropzone"]:hover { border-color: #a1a1aa !important; }
+    [data-testid="stFileUploaderDropzone"] p,
+    [data-testid="stFileUploaderDropzone"] span { color: #a1a1aa !important; font-size: 0.8rem !important; }
+    [data-testid="stFileUploaderDropzone"] small { color: #d4d4d8 !important; }
+
+    /* ── Threshold slider ── */
+    .threshold-label {
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #a1a1aa;
+        margin-bottom: 0.25rem;
+    }
+    div[data-testid="stSlider"] { padding-top: 0.25rem; }
+    div[data-testid="stSlider"] label { display: none; }
+
+    /* ── 3-column metric row variant ── */
+    .metric-row-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: #e4e4e7;
+        border: 1px solid #e4e4e7;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 3rem;
+    }
 
     /* ── Divider spacer ── */
     .spacer { height: 2rem; }
@@ -270,96 +307,171 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-BG_CARD  = "#0d0d10"
-GRID     = "#1c1c1f"
-TEXT_DIM = "#3f3f46"
+BG_CARD  = "#fafafa"
+GRID     = "#e4e4e7"
+TEXT_DIM = "#a1a1aa"
 BLUE     = "#3b82f6"
-BLUE_MID = "#1d4ed8"
-GRAY     = "#27272a"
+GRAY     = "#d4d4d8"
 GREEN    = "#4ade80"
 
 
-def base_layout():
-    return dict(
+def base_layout(legend=False):
+    layout = dict(
         paper_bgcolor=BG_CARD,
         plot_bgcolor=BG_CARD,
-        font=dict(family="Inter, sans-serif", color=TEXT_DIM, size=11),
+        font=dict(family="Inter, sans-serif", color="#71717a", size=11),
         margin=dict(l=4, r=4, t=4, b=4),
-        showlegend=False,
+        showlegend=legend,
         hoverlabel=dict(
-            bgcolor="#18181b",
-            bordercolor="#27272a",
-            font=dict(family="Inter, sans-serif", size=12, color="#e4e4e7"),
+            bgcolor="#ffffff",
+            bordercolor="#e4e4e7",
+            font=dict(family="Inter, sans-serif", size=12, color="#09090b"),
         ),
     )
+    if legend:
+        layout['legend'] = dict(
+            orientation='h', x=0, y=1.18,
+            font=dict(size=11, color="#71717a"),
+            bgcolor='rgba(0,0,0,0)',
+        )
+    return layout
 
 
-def analyse(df):
-    clusters = df.drop_duplicates('cluster_id').copy()
-    clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
-    clusters['terminatingevent'] = pd.to_datetime(clusters['terminatingevent'])
-    clusters = clusters[clusters['createcluster'] >= '2026-01-01'].copy()
-    clusters['create_month'] = clusters['createcluster'].dt.to_period('M')
-    clusters['close_month']  = clusters['terminatingevent'].dt.to_period('M')
+BAND_LOWER = {
+    '0–0.25':    0.0,
+    '0.26–0.50': 0.26,
+    '0.51–0.75': 0.51,
+    '0.76–0.80': 0.76,
+    '0.81–0.90': 0.81,
+    '0.91–1.0':  0.91,
+}
 
-    monthly_created = clusters.groupby('create_month').size().reset_index(name='created')
-    monthly_created['month_str'] = monthly_created['create_month'].dt.strftime('%b')
+ATHENA_QUERY = """\
+SELECT
+    cc.cluster_id,
+    'https://cluster-tracker-ui.prod.kobaltmusic.com/work_mapping?id=' || cc.cluster_id AS cluster_link,
+    MAX(cs.cluster_state) AS current_cluster_status,
+    MAX(cc.createcluster) AS created_date,
+    MAX(cc.terminatingevent) AS terminated_date,
+    -- Takes the highest score found in the cluster and rounds it
+    ROUND(MAX(ws.work_score_percentile), 2) AS cluster_max_work_score
+FROM cmdq_kobalt_prod.wk_cluster_conversion cc
+JOIN cmdq_kobalt_prod.cluster_summary cs ON cc.cluster_id = cs.cluster_id
+LEFT JOIN repertoire_kobalt_prod.work_score_current ws ON cs.cluster_item = ws.work_id
+GROUP BY
+    cc.cluster_id,
+    cc.createcluster,
+    cc.terminatingevent
+ORDER BY cluster_max_work_score DESC;\
+"""
+
+COLUMN_ALIASES = {
+    'created_date':            'createcluster',
+    'terminated_date':         'terminatingevent',
+    'cluster_max_work_score':  'wk_score_2dp',
+}
+
+REQUIRED_COLUMNS = {'cluster_id', 'current_cluster_status', 'createcluster',
+                    'terminatingevent', 'wk_score_2dp'}
+
+
+def normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
+    return df.rename(columns={k: v for k, v in COLUMN_ALIASES.items() if k in df.columns})
+
+
+def analyse(df, threshold=0.90, month_filter=None):
+    df = normalise_columns(df)
+    all_clusters = df.drop_duplicates('cluster_id').copy()
+    all_clusters['createcluster']    = pd.to_datetime(all_clusters['createcluster'])
+    all_clusters['terminatingevent'] = pd.to_datetime(all_clusters['terminatingevent'])
+    all_clusters['create_month'] = all_clusters['createcluster'].dt.to_period('M')
+    all_clusters['close_month']  = all_clusters['terminatingevent'].dt.to_period('M')
+
+    clusters = all_clusters
 
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
-    closed = clusters[
-        clusters['current_cluster_status'].isin(closed_statuses) &
-        clusters['terminatingevent'].notna() &
-        (clusters['terminatingevent'] >= '2026-01-01')
+    all_closed = all_clusters[
+        all_clusters['current_cluster_status'].isin(closed_statuses) &
+        all_clusters['terminatingevent'].notna()
     ].copy()
-    closed['close_type'] = closed['current_cluster_status'].apply(
+    all_closed['close_type'] = all_closed['current_cluster_status'].apply(
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
     )
 
-    monthly_closed = (
-        closed.groupby(['close_month', 'close_type'])
-        .size().unstack(fill_value=0).reset_index()
-    )
-    monthly_closed['month_str'] = monthly_closed['close_month'].dt.strftime('%b')
-    for col in ['Merged', 'NoDuplicates']:
-        if col not in monthly_closed.columns:
-            monthly_closed[col] = 0
+    if month_filter is not None:
+        sel        = month_filter                          # pd.Period
+        month_end  = sel.to_timestamp(how='end')          # last instant of month
 
-    closed['value_band'] = pd.cut(
-        closed['wk_score_2dp'],
-        bins=[0, 0.7, 0.8, 0.9, 1.001],
-        labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
-        right=False,
-    )
-    closure_by_value = (
-        closed.groupby(['value_band', 'close_type'])
-        .size().unstack(fill_value=0)
-    )
+        total_created  = int((all_clusters['create_month'] == sel).sum())
+        closed         = all_closed[all_closed['close_month'] == sel].copy()
+        total_closed   = len(closed)
+        monthly_totals = None                             # chart replaced by stat row
+
+        # Open as of end-of-month: created any time, not yet closed
+        backlog = all_clusters[
+            (all_clusters['createcluster'] <= month_end) &
+            (all_clusters['terminatingevent'].isna() |
+             (all_clusters['terminatingevent'] > month_end))
+        ].copy()
+    else:
+        total_created = len(all_clusters)
+        closed        = all_closed.copy()
+        total_closed  = len(closed)
+
+        monthly_created    = all_clusters.groupby('create_month').size().reset_index(name='created')
+        monthly_closed_agg = closed.groupby('close_month').size().reset_index(name='closed')
+        monthly_totals = (
+            monthly_created.rename(columns={'create_month': 'month'})
+            .merge(monthly_closed_agg.rename(columns={'close_month': 'month'}),
+                   on='month', how='outer')
+            .fillna(0).sort_values('month')
+        )
+        monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b %Y')
+        monthly_totals['created']   = monthly_totals['created'].astype(int)
+        monthly_totals['closed']    = monthly_totals['closed'].astype(int)
+
+        # Backlog: all SuspectedDuplicates regardless of creation date
+        backlog = all_clusters[all_clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
+
+    # ── Score band breakdown (shared) ────────────────────────────────────────────
+    BINS   = [0, 0.26, 0.51, 0.76, 0.81, 0.91, 1.001]
+    LABELS = ['0–0.25', '0.26–0.50', '0.51–0.75', '0.76–0.80', '0.81–0.90', '0.91–1.0']
+
+    closed['value_band'] = pd.cut(closed['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
+    closure_by_value = closed.groupby(['value_band', 'close_type']).size().unstack(fill_value=0)
     for col in ['Merged', 'NoDuplicates']:
         if col not in closure_by_value.columns:
             closure_by_value[col] = 0
     closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['NoDuplicates']
 
-    open_statuses = ['SuspectedDuplicates', 'SuspectedDuplicatesRevisited',
-                     'MergeReady', 'HasConflicts', 'WritersMapped']
-    backlog = clusters[clusters['current_cluster_status'].isin(open_statuses)].copy()
     total_backlog = len(backlog)
-    backlog['band'] = pd.cut(
-        backlog['wk_score_2dp'],
-        bins=[0, 0.7, 0.8, 0.9, 1.001],
-        labels=['< 0.7', '0.7–0.8', '0.8–0.9', '0.9–1.0'],
-        right=False,
-    )
+    backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
     band_counts = backlog['band'].value_counts().sort_index()
 
+    # ── Conversion metrics ────────────────────────────────────────────
+    merged_count = int((closed['close_type'] == 'Merged').sum())
+    nodup_count  = int((closed['close_type'] == 'NoDuplicates').sum())
+    # Denominator: clusters raised (All) or backlog as of month-end (month filter)
+    rate_base    = total_backlog if month_filter is not None else total_created
+    def pct(n): return round(n / rate_base * 100, 1) if rate_base else 0.0
+    conversion_rate = pct(total_closed)
+    merged_pct      = pct(merged_count)
+    nodup_pct       = pct(nodup_count)
+
     return dict(
-        total_created=len(clusters),
-        total_closed=len(closed),
+        total_created=total_created,
+        total_closed=total_closed,
         total_backlog=total_backlog,
-        valuable_backlog=int((backlog['wk_score_2dp'] >= 0.9).sum()),
-        monthly_created=monthly_created,
-        monthly_closed=monthly_closed,
+        valuable_backlog=int((backlog['wk_score_2dp'] >= threshold).sum()),
+        monthly_totals=monthly_totals,
         closure_by_value=closure_by_value,
         band_counts=band_counts,
+        conversion_rate=conversion_rate,
+        merged_count=merged_count,
+        merged_pct=merged_pct,
+        nodup_count=nodup_count,
+        nodup_pct=nodup_pct,
+        rate_base=rate_base,
     )
 
 
@@ -370,179 +482,246 @@ def section_label(text):
     )
 
 
-def render_dashboard(data):
-    d = data
+def build_insights_csv(d, threshold):
+    lines = [
+        "# Cluster Analytics — Insights snapshot",
+        f"# Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC",
+        f"# Value threshold: {threshold:.2f}",
+        "",
+        "## Summary",
+        "Metric,Value",
+        f"Clusters created (all time),{d['total_created']}",
+        f"Closed clusters,{d['total_closed']}",
+        f"Open backlog (SuspectedDuplicates),{d['total_backlog']}",
+        f"Valuable backlog (score >= {threshold:.2f}),{d['valuable_backlog']}",
+        "",
+        "## Monthly totals",
+        "Month,Created,Closed",
+    ]
+    if d['monthly_totals'] is not None:
+        for _, row in d['monthly_totals'].iterrows():
+            lines.append(f"{row['month_str']},{row['created']},{row['closed']}")
+    lines += [
+        "",
+        "## Backlog score distribution (SuspectedDuplicates)",
+        "Score band,Clusters,% of backlog",
+    ]
+    total = d['total_backlog']
+    for band, count in d['band_counts'].items():
+        pct = f"{count / total * 100:.1f}%" if total else "—"
+        lines.append(f"{band},{count},{pct}")
+    return "\n".join(lines)
 
-    # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div class="page-header">
-        <h1>Cluster Analytics</h1>
-        <span class="subtitle">Jan 2026 onwards<span class="dot">·</span>Valuable threshold: score ≥ 0.9</span>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # ── Metrics ───────────────────────────────────────────────────────────────
+def render_dashboard(df):
+    # ── Derive available months from data ─────────────────────────────────────────────
+    tmp = normalise_columns(df.drop_duplicates('cluster_id').copy())
+    tmp['createcluster'] = pd.to_datetime(tmp['createcluster'])
+    available_months = sorted(
+        m for m in tmp['createcluster'].dt.to_period('M').dropna().unique()
+        if m >= pd.Period('2025-09', 'M')
+    )
+    month_options    = ['All'] + [m.strftime('%b %Y') for m in available_months]
+
+    # ── Header + controls ────────────────────────────────────────────────────────────────
+    hcol, scol = st.columns([3, 1])
+    with hcol:
+        st.markdown("""
+        <div class="page-header">
+            <h1>Cluster Analytics</h1>
+            <span class="subtitle">All time</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with scol:
+        st.markdown('<div class="threshold-label">Value threshold</div>', unsafe_allow_html=True)
+        threshold = st.slider(
+            "Value threshold", min_value=0.70, max_value=0.99,
+            value=0.90, step=0.01, format="%.2f",
+            label_visibility="collapsed",
+        )
+
+    mcol, _ = st.columns([2, 6])
+    with mcol:
+        st.markdown('<div class="threshold-label">Filter by month</div>', unsafe_allow_html=True)
+        selected_label = st.selectbox(
+            "Filter by month", month_options, label_visibility="collapsed",
+        )
+    month_filter = (
+        None if selected_label == 'All'
+        else pd.Period(selected_label, 'M')
+    )
+
+    d = analyse(df, threshold, month_filter)
+    st.session_state.last_insights = build_insights_csv(d, threshold)
+    st.session_state.last_insights_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+
+    # ── Metrics ──────────────────────────────────────────────────────────────────────────
+    period_label  = selected_label if month_filter else 'All time'
+    backlog_label = f'Open as of end of {selected_label}' if month_filter else 'SuspectedDuplicates only'
     st.markdown(f"""
     <div class="metric-row">
         <div class="metric-card">
             <div class="label">Clusters created</div>
             <div class="value">{d['total_created']:,}</div>
-            <div class="sub">Jan 2026 onwards</div>
+            <div class="sub">{period_label}</div>
         </div>
         <div class="metric-card">
             <div class="label">Closed clusters</div>
             <div class="value">{d['total_closed']:,}</div>
-            <div class="sub">Merged + NoDuplicates</div>
+            <div class="sub">{period_label}</div>
         </div>
         <div class="metric-card">
             <div class="label">Open backlog</div>
             <div class="value">{d['total_backlog']:,}</div>
-            <div class="sub">Suspected duplicates</div>
+            <div class="sub">{backlog_label}</div>
         </div>
         <div class="metric-card highlight">
             <div class="label">Valuable backlog</div>
             <div class="value">{d['valuable_backlog']:,}</div>
-            <div class="sub">Score ≥ 0.9</div>
+            <div class="sub">Score ≥ {threshold:.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Monthly creation ──────────────────────────────────────────────────────
-    section_label("Monthly cluster creation")
-    mc = d['monthly_created']
-    fig1 = go.Figure()
-    fig1.add_trace(go.Bar(
-        x=mc['month_str'],
-        y=mc['created'],
-        marker=dict(color=BLUE, line_width=0, cornerradius=4),
-        hovertemplate='<b>%{x}</b>  %{y:,}<extra></extra>',
-    ))
-    fig1.update_layout(
-        **base_layout(),
-        height=200,
-        bargap=0.45,
-        xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
-        yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), tickformat=',', zeroline=False),
+    # ── Conversion metrics row ────────────────────────────────────────────
+    rate_sub = (
+        f"of {selected_label} backlog ({d['rate_base']:,} clusters)"
+        if month_filter else
+        f"of all clusters raised ({d['rate_base']:,})"
     )
-    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
-    st.markdown('</div>', unsafe_allow_html=True)
+    merged_sub = (
+        f"{d['merged_count']:,} merged {'that month' if month_filter else 'all time'}"
+    )
+    nodup_sub = (
+        f"{d['nodup_count']:,} no duplicates {'that month' if month_filter else 'all time'}"
+    )
+    st.markdown(f"""
+    <div class="metric-row-3">
+        <div class="metric-card">
+            <div class="label">Conversion rate</div>
+            <div class="value">{d['conversion_rate']:.1f}%</div>
+            <div class="sub">{rate_sub}</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Merged</div>
+            <div class="value">{d['merged_pct']:.1f}%</div>
+            <div class="sub">{merged_sub}</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">No duplicates</div>
+            <div class="value">{d['nodup_pct']:.1f}%</div>
+            <div class="sub">{nodup_sub}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+    # ── Created vs Closed: line chart (All mode only) ───────
+    if month_filter is None:
+        section_label("Monthly created vs closed")
+        mt = d['monthly_totals']
+        fig1 = go.Figure()
+        fig1.add_trace(go.Scatter(
+            x=mt['month_str'], y=mt['created'],
+            name='Created',
+            mode='lines+markers',
+            line=dict(color='#3266ad', width=2, shape='spline', smoothing=0.3),
+            marker=dict(color='#3266ad', size=5, symbol='circle'),
+            fill='tozeroy',
+            fillcolor='rgba(50, 102, 173, 0.08)',
+            hovertemplate='Created: <b>%{y:,}</b><extra></extra>',
+        ))
+        fig1.add_trace(go.Scatter(
+            x=mt['month_str'], y=mt['closed'],
+            name='Closed',
+            mode='lines+markers',
+            line=dict(color='#1D9E75', width=2, shape='spline', smoothing=0.3),
+            marker=dict(color='#1D9E75', size=5, symbol='circle'),
+            fill='tozeroy',
+            fillcolor='rgba(29, 158, 117, 0.08)',
+            hovertemplate='Closed: <b>%{y:,}</b><extra></extra>',
+        ))
+        fig1.update_layout(
+            **base_layout(legend=True),
+            height=280,
+            hovermode='x unified',
+            xaxis=dict(
+                showgrid=False, tickfont=dict(size=11), linecolor=GRAY,
+                zeroline=False, tickmode='array',
+                tickvals=mt['month_str'].tolist(), ticktext=mt['month_str'].tolist(),
+            ),
+            yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
+        )
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+        st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-    # ── Two-column charts ─────────────────────────────────────────────────────
-    col1, col2 = st.columns(2, gap="large")
+    # ── Closures by score band + backlog table (side by side) ─────────────────
+    col_chart, col_table = st.columns(2, gap="large")
 
-    with col1:
-        section_label("Monthly closure rate")
-        mclose = d['monthly_closed']
+    with col_chart:
+        section_label("Closures by score band")
+        cv = d['closure_by_value']
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(
-            x=mclose['month_str'], y=mclose['Merged'],
-            name='Merged',
-            marker=dict(color=BLUE, line_width=0, cornerradius=4),
-            hovertemplate='<b>%{x}</b> Merged  %{y:,}<extra></extra>',
+            y=cv.index.astype(str), x=cv['Merged'],
+            name='Merged', orientation='h',
+            marker=dict(color='#3266ad', line_width=0, cornerradius=4),
+            hovertemplate='<b>%{y}</b> Merged  %{x:,}<extra></extra>',
         ))
         fig2.add_trace(go.Bar(
-            x=mclose['month_str'], y=mclose['NoDuplicates'],
-            name='No duplicates',
-            marker=dict(color=GRAY, line_width=0, cornerradius=4),
-            hovertemplate='<b>%{x}</b> No dup  %{y:,}<extra></extra>',
+            y=cv.index.astype(str), x=cv['NoDuplicates'],
+            name='No duplicates', orientation='h',
+            marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
+            hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
         ))
         fig2.update_layout(
-            **base_layout(),
-            height=210, barmode='stack', bargap=0.45,
-            showlegend=True,
-            legend=dict(
-                orientation='h', x=0, y=1.18,
-                font=dict(size=11, color="#52525b"),
-                bgcolor='rgba(0,0,0,0)',
-                traceorder='normal',
-            ),
-            xaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
-            yaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
+            **base_layout(legend=True),
+            height=240, barmode='stack', bargap=0.45,
+            xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False, tickformat='.2~s'),
+            yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
         )
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col2:
-        section_label("Closures by score band")
-        cv = d['closure_by_value']
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(
-            y=cv.index.astype(str), x=cv['Merged'],
-            name='Merged', orientation='h',
-            marker=dict(color=BLUE, line_width=0, cornerradius=4),
-            hovertemplate='<b>%{y}</b> Merged  %{x:,}<extra></extra>',
-        ))
-        fig3.add_trace(go.Bar(
-            y=cv.index.astype(str), x=cv['NoDuplicates'],
-            name='No duplicates', orientation='h',
-            marker=dict(color=GRAY, line_width=0, cornerradius=4),
-            hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
-        ))
-        fig3.update_layout(
-            **base_layout(),
-            height=210, barmode='stack', bargap=0.45,
-            showlegend=True,
-            legend=dict(
-                orientation='h', x=0, y=1.18,
-                font=dict(size=11, color="#52525b"),
-                bgcolor='rgba(0,0,0,0)',
-            ),
-            xaxis=dict(gridcolor=GRID, tickfont=dict(size=11), zeroline=False),
-            yaxis=dict(showgrid=False, tickfont=dict(size=11), linecolor=GRAY, zeroline=False),
-        )
-        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
+    with col_table:
+        section_label("Unresolved backlog — score distribution")
+        bc    = d['band_counts']
+        total = d['total_backlog']
+        rows  = ""
+        for band, count in bc.items():
+            pct      = count / total * 100
+            pct_str  = f"{pct:.1f}%"
+            bar_w    = max(2, int(pct * 0.8))
+            is_val   = BAND_LOWER.get(str(band), 0.0) >= threshold
+            tag      = '<span class="val-tag">valuable</span>' if is_val else ''
+            bar_cls  = 'green' if is_val else ''
+            bar_cell = (
+                f'<div class="pct-bar-wrap">'
+                f'<div class="pct-bar {bar_cls}" style="width:{bar_w}px"></div>'
+                f'{pct_str}</div>'
+            )
+            rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{bar_cell}</td></tr>"
+        rows += f"<tr><td>Total</td><td>{total:,}</td><td>100%</td></tr>"
 
-    # ── Backlog table ─────────────────────────────────────────────────────────
-    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-    section_label("Unresolved backlog — score distribution")
-
-    bc    = d['band_counts']
-    total = d['total_backlog']
-    rows  = ""
-    for band, count in bc.items():
-        pct      = count / total * 100
-        pct_str  = f"{pct:.1f}%"
-        bar_w    = max(2, int(pct * 0.8))
-        is_val   = band == '0.9–1.0'
-        tag      = '<span class="val-tag">valuable</span>' if is_val else ''
-        bar_cls  = 'green' if is_val else ''
-        bar_cell = (
-            f'<div class="pct-bar-wrap">'
-            f'<div class="pct-bar {bar_cls}" style="width:{bar_w}px"></div>'
-            f'{pct_str}</div>'
-        )
-        rows += f"<tr><td>{band}{tag}</td><td>{count:,}</td><td>{bar_cell}</td></tr>"
-    rows += f"<tr><td>Total</td><td>{total:,}</td><td>100%</td></tr>"
-
-    st.markdown(f"""
-    <div class="tbl-card">
-        <table class="backlog-table">
-            <thead><tr>
-                <th>Score band</th>
-                <th>Clusters</th>
-                <th style="text-align:right">% of backlog</th>
-            </tr></thead>
-            <tbody>{rows}</tbody>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="tbl-card">
+            <table class="backlog-table">
+                <thead><tr>
+                    <th>Score band</th>
+                    <th>Clusters</th>
+                    <th style="text-align:right">% of backlog</th>
+                </tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────────────
 
-uploaded = st.file_uploader(
-    "Upload cluster CSV",
-    type=["csv"],
-    label_visibility="collapsed",
-)
-
-if uploaded is None:
+if 'df' not in st.session_state:
     st.markdown("""
     <div class="upload-wrap">
         <div class="upload-icon">📊</div>
@@ -557,17 +736,37 @@ if uploaded is None:
         </div>
     </div>
     """, unsafe_allow_html=True)
-    st.file_uploader("Upload CSV", type=["csv"], key="hidden", label_visibility="collapsed")
+
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        uploaded = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+        with st.expander("Get data from Athena"):
+            st.code(ATHENA_QUERY, language="sql")
+    if uploaded:
+        try:
+            df = pd.read_csv(uploaded)
+            df = normalise_columns(df)
+            missing = REQUIRED_COLUMNS - set(df.columns)
+            if missing:
+                st.error(f"Missing columns: {', '.join(sorted(missing))}")
+            else:
+                st.session_state.df = df
+                st.rerun()
+        except Exception as e:
+            st.error(f"Could not process file: {e}")
 else:
-    try:
-        df = pd.read_csv(uploaded)
-        required = {'cluster_id', 'current_cluster_status', 'createcluster',
-                    'terminatingevent', 'wk_score_2dp'}
-        missing = required - set(df.columns)
-        if missing:
-            st.error(f"Missing columns: {', '.join(sorted(missing))}")
-        else:
-            data = analyse(df)
-            render_dashboard(data)
-    except Exception as e:
-        st.error(f"Could not process file: {e}")
+    render_dashboard(st.session_state.df)
+    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
+    dl_col, _, switch_col = st.columns([2, 6, 2])
+    with dl_col:
+        if 'last_insights' in st.session_state:
+            st.download_button(
+                label="Download insights",
+                data=st.session_state.last_insights,
+                file_name=f"cluster_insights_{datetime.utcnow().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+            )
+    with switch_col:
+        if st.button("↑ Upload a different file", type="tertiary"):
+            del st.session_state.df
+            st.rerun()
