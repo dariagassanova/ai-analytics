@@ -387,14 +387,14 @@ def analyse(df, threshold=0.90, month_filter=None):
     all_clusters['create_month'] = all_clusters['createcluster'].dt.to_period('M')
     all_clusters['close_month']  = all_clusters['terminatingevent'].dt.to_period('M')
 
-    # Created/closed stats scoped to Jan 2026+
+    # Created stats scoped to Jan 2026+; closures drawn from all_clusters (any creation date)
     clusters = all_clusters[all_clusters['createcluster'] >= '2026-01-01'].copy()
 
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
-    all_closed = clusters[
-        clusters['current_cluster_status'].isin(closed_statuses) &
-        clusters['terminatingevent'].notna() &
-        (clusters['terminatingevent'] >= '2026-01-01')
+    all_closed = all_clusters[
+        all_clusters['current_cluster_status'].isin(closed_statuses) &
+        all_clusters['terminatingevent'].notna() &
+        (all_clusters['terminatingevent'] >= '2026-01-01')
     ].copy()
     all_closed['close_type'] = all_closed['current_cluster_status'].apply(
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
