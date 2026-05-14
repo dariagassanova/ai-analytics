@@ -346,24 +346,7 @@ BAND_LOWER = {
     '0.91–1.0':  0.91,
 }
 
-ATHENA_QUERY = """\
-SELECT
-    cc.cluster_id,
-    'https://cluster-tracker-ui.prod.kobaltmusic.com/work_mapping?id=' || cc.cluster_id AS cluster_link,
-    MAX(cs.cluster_state) AS current_cluster_status,
-    MAX(cc.createcluster) AS created_date,
-    MAX(cc.terminatingevent) AS terminated_date,
-    -- Takes the highest score found in the cluster and rounds it
-    ROUND(MAX(ws.work_score_percentile), 2) AS cluster_max_work_score
-FROM cmdq_kobalt_prod.wk_cluster_conversion cc
-JOIN cmdq_kobalt_prod.cluster_summary cs ON cc.cluster_id = cs.cluster_id
-LEFT JOIN repertoire_kobalt_prod.work_score_current ws ON cs.cluster_item = ws.work_id
-GROUP BY
-    cc.cluster_id,
-    cc.createcluster,
-    cc.terminatingevent
-ORDER BY cluster_max_work_score DESC;\
-"""
+ATHENA_QUERY = "select * from cmdq_kobalt_prod.dg_cluster_conversion"
 
 COLUMN_ALIASES = {
     'created_date':            'createcluster',
@@ -517,7 +500,10 @@ def render_dashboard(df):
     # ── Derive available months from data ─────────────────────────────────────────────
     tmp = normalise_columns(df.drop_duplicates('cluster_id').copy())
     tmp['createcluster'] = pd.to_datetime(tmp['createcluster'])
-    available_months = sorted(tmp['createcluster'].dt.to_period('M').dropna().unique())
+    available_months = sorted(
+        m for m in tmp['createcluster'].dt.to_period('M').dropna().unique()
+        if m >= pd.Period('2025-09', 'M')
+    )
     month_options    = ['All'] + [m.strftime('%b %Y') for m in available_months]
 
     # ── Header + controls ────────────────────────────────────────────────────────────────
@@ -612,7 +598,7 @@ def render_dashboard(df):
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Created vs Closed: line chart (All) or stat row (single month) ───────
+    # ── Created vs Closed: line chart (All mode only) ───────
     if month_filter is None:
         section_label("Monthly created vs closed")
         mt = d['monthly_totals']
@@ -651,23 +637,6 @@ def render_dashboard(df):
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
         st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        # Single month: show a compact created/closed stat strip
-        st.markdown(f"""
-        <div class="metric-row" style="margin-bottom:1.5rem">
-            <div class="metric-card" style="border-left:3px solid #3266ad">
-                <div class="label">Created in {selected_label}</div>
-                <div class="value" style="color:#3266ad">{d['total_created']:,}</div>
-            </div>
-            <div class="metric-card" style="border-left:3px solid #1D9E75">
-                <div class="label">Closed in {selected_label}</div>
-                <div class="value" style="color:#1D9E75">{d['total_closed']:,}</div>
-            </div>
-            <div class="metric-card" style="opacity:0;pointer-events:none"></div>
-            <div class="metric-card" style="opacity:0;pointer-events:none"></div>
-        </div>
-        """, unsafe_allow_html=True)
-
     st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
     # ── Closures by score band + backlog table (side by side) ─────────────────
