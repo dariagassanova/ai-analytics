@@ -429,7 +429,7 @@ def analyse(df, threshold=0.90, month_filter=None):
 
     total_backlog = len(backlog)
     backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
-    band_counts = backlog['band'].value_counts().sort_index()
+    band_counts = backlog['band'].value_counts().sort_index(ascending=False)
 
     # ── Conversion metrics ────────────────────────────────────────────
     merged_count = int((closed['close_type'] == 'Merged').sum())
