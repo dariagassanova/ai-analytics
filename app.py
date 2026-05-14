@@ -346,24 +346,7 @@ BAND_LOWER = {
     '0.91–1.0':  0.91,
 }
 
-ATHENA_QUERY = """\
-SELECT
-    cc.cluster_id,
-    'https://cluster-tracker-ui.prod.kobaltmusic.com/work_mapping?id=' || cc.cluster_id AS cluster_link,
-    MAX(cs.cluster_state) AS current_cluster_status,
-    MAX(cc.createcluster) AS created_date,
-    MAX(cc.terminatingevent) AS terminated_date,
-    -- Takes the highest score found in the cluster and rounds it
-    ROUND(MAX(ws.work_score_percentile), 2) AS cluster_max_work_score
-FROM cmdq_kobalt_prod.wk_cluster_conversion cc
-JOIN cmdq_kobalt_prod.cluster_summary cs ON cc.cluster_id = cs.cluster_id
-LEFT JOIN repertoire_kobalt_prod.work_score_current ws ON cs.cluster_item = ws.work_id
-GROUP BY
-    cc.cluster_id,
-    cc.createcluster,
-    cc.terminatingevent
-ORDER BY cluster_max_work_score DESC;\
-"""
+ATHENA_QUERY = "select * from cmdq_kobalt_prod.dg_cluster_conversion"
 
 COLUMN_ALIASES = {
     'created_date':            'createcluster',
