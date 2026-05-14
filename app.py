@@ -287,6 +287,18 @@ st.markdown("""
     div[data-testid="stSlider"] { padding-top: 0.25rem; }
     div[data-testid="stSlider"] label { display: none; }
 
+    /* ── 3-column metric row variant ── */
+    .metric-row-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: #e4e4e7;
+        border: 1px solid #e4e4e7;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 3rem;
+    }
+
     /* ── Divider spacer ── */
     .spacer { height: 2rem; }
     .spacer-sm { height: 1.25rem; }
@@ -438,6 +450,16 @@ def analyse(df, threshold=0.90, month_filter=None):
     backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
     band_counts = backlog['band'].value_counts().sort_index()
 
+    # ── Conversion metrics ────────────────────────────────────────────
+    merged_count = int((closed['close_type'] == 'Merged').sum())
+    nodup_count  = int((closed['close_type'] == 'NoDuplicates').sum())
+    # Denominator: clusters raised (All) or backlog as of month-end (month filter)
+    rate_base    = total_backlog if month_filter is not None else total_created
+    def pct(n): return round(n / rate_base * 100, 1) if rate_base else 0.0
+    conversion_rate = pct(total_closed)
+    merged_pct      = pct(merged_count)
+    nodup_pct       = pct(nodup_count)
+
     return dict(
         total_created=total_created,
         total_closed=total_closed,
@@ -446,6 +468,12 @@ def analyse(df, threshold=0.90, month_filter=None):
         monthly_totals=monthly_totals,
         closure_by_value=closure_by_value,
         band_counts=band_counts,
+        conversion_rate=conversion_rate,
+        merged_count=merged_count,
+        merged_pct=merged_pct,
+        nodup_count=nodup_count,
+        nodup_pct=nodup_pct,
+        rate_base=rate_base,
     )
 
 
@@ -551,6 +579,38 @@ def render_dashboard(df):
             <div class="label">Valuable backlog</div>
             <div class="value">{d['valuable_backlog']:,}</div>
             <div class="sub">Score ≥ {threshold:.2f}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Conversion metrics row ────────────────────────────────────────────
+    rate_sub = (
+        f"of {selected_label} backlog ({d['rate_base']:,} clusters)"
+        if month_filter else
+        f"of Jan 2026+ clusters raised ({d['rate_base']:,})"
+    )
+    merged_sub = (
+        f"{d['merged_count']:,} merged {'that month' if month_filter else 'Jan 2026+'}"
+    )
+    nodup_sub = (
+        f"{d['nodup_count']:,} no duplicates {'that month' if month_filter else 'Jan 2026+'}"
+    )
+    st.markdown(f"""
+    <div class="metric-row-3">
+        <div class="metric-card">
+            <div class="label">Conversion rate</div>
+            <div class="value">{d['conversion_rate']:.1f}%</div>
+            <div class="sub">{rate_sub}</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Merged</div>
+            <div class="value">{d['merged_pct']:.1f}%</div>
+            <div class="sub">{merged_sub}</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">No duplicates</div>
+            <div class="value">{d['nodup_pct']:.1f}%</div>
+            <div class="sub">{nodup_sub}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
