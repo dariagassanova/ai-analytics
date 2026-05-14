@@ -291,29 +291,6 @@ st.markdown("""
     .spacer { height: 2rem; }
     .spacer-sm { height: 1.25rem; }
 
-    /* ── Age section ── */
-    .age-metric-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1px;
-        background: #e4e4e7;
-        border: 1px solid #e4e4e7;
-        border-radius: 12px;
-        overflow: hidden;
-        margin-bottom: 1.25rem;
-    }
-    .cohort-dot {
-        display: inline-block;
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        margin-right: 7px;
-        flex-shrink: 0;
-        vertical-align: middle;
-        position: relative;
-        top: -1px;
-    }
-
     .stPlotlyChart { border-radius: 8px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -392,12 +369,14 @@ def normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def analyse(df, threshold=0.90, month_filter=None):
     df = normalise_columns(df)
-    clusters = df.drop_duplicates('cluster_id').copy()
-    clusters['createcluster']    = pd.to_datetime(clusters['createcluster'])
-    clusters['terminatingevent'] = pd.to_datetime(clusters['terminatingevent'])
-    clusters = clusters[clusters['createcluster'] >= '2026-01-01'].copy()
-    clusters['create_month'] = clusters['createcluster'].dt.to_period('M')
-    clusters['close_month']  = clusters['terminatingevent'].dt.to_period('M')
+    all_clusters = df.drop_duplicates('cluster_id').copy()
+    all_clusters['createcluster']    = pd.to_datetime(all_clusters['createcluster'])
+    all_clusters['terminatingevent'] = pd.to_datetime(all_clusters['terminatingevent'])
+    all_clusters['create_month'] = all_clusters['createcluster'].dt.to_period('M')
+    all_clusters['close_month']  = all_clusters['terminatingevent'].dt.to_period('M')
+
+    # Created/closed stats scoped to Jan 2026+
+    clusters = all_clusters[all_clusters['createcluster'] >= '2026-01-01'].copy()
 
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
     all_closed = clusters[
@@ -418,11 +397,11 @@ def analyse(df, threshold=0.90, month_filter=None):
         total_closed   = len(closed)
         monthly_totals = None                             # chart replaced by stat row
 
-        # Open as of end-of-month: created before/during month, not yet closed
-        backlog = clusters[
-            (clusters['createcluster'] <= month_end) &
-            (clusters['terminatingevent'].isna() |
-             (clusters['terminatingevent'] > month_end))
+        # Open as of end-of-month: created any time, not yet closed
+        backlog = all_clusters[
+            (all_clusters['createcluster'] <= month_end) &
+            (all_clusters['terminatingevent'].isna() |
+             (all_clusters['terminatingevent'] > month_end))
         ].copy()
     else:
         total_created = len(clusters)
@@ -441,9 +420,10 @@ def analyse(df, threshold=0.90, month_filter=None):
         monthly_totals['created']   = monthly_totals['created'].astype(int)
         monthly_totals['closed']    = monthly_totals['closed'].astype(int)
 
-        backlog = clusters[clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
+        # Backlog: all SuspectedDuplicates regardless of creation date
+        backlog = all_clusters[all_clusters['current_cluster_status'] == 'SuspectedDuplicates'].copy()
 
-    # ── Score band breakdown (shared) ────────────────────────────────────────
+    # ── Score band breakdown (shared) ────────────────────────────────────────────
     BINS   = [0, 0.26, 0.51, 0.76, 0.81, 0.91, 1.001]
     LABELS = ['0–0.25', '0.26–0.50', '0.51–0.75', '0.76–0.80', '0.81–0.90', '0.91–1.0']
 
@@ -458,30 +438,6 @@ def analyse(df, threshold=0.90, month_filter=None):
     backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
     band_counts = backlog['band'].value_counts().sort_index()
 
-    # ── Backlog age for valuable clusters ─────────────────────────────────────
-    today   = pd.Timestamp.today().normalize()
-    val_bl  = backlog[backlog['wk_score_2dp'] >= threshold].copy()
-    val_bl['age_days'] = (today - val_bl['createcluster']).dt.days
-
-    if len(val_bl) > 0:
-        overall_median_age = int(val_bl['age_days'].median())
-        overall_avg_age    = round(float(val_bl['age_days'].mean()), 1)
-        age_by_cohort = (
-            val_bl.groupby('create_month')['age_days']
-            .agg(count='count', median='median', mean='mean', oldest='max')
-            .reset_index()
-            .sort_values('create_month')
-        )
-        age_by_cohort['month_str'] = age_by_cohort['create_month'].dt.strftime('%b %Y')
-        age_by_cohort['median']    = age_by_cohort['median'].round(0).astype(int)
-        age_by_cohort['mean']      = age_by_cohort['mean'].round(1)
-        age_by_cohort['oldest']    = age_by_cohort['oldest'].astype(int)
-        age_by_cohort['count']     = age_by_cohort['count'].astype(int)
-    else:
-        overall_median_age = None
-        overall_avg_age    = None
-        age_by_cohort      = pd.DataFrame()
-
     return dict(
         total_created=total_created,
         total_closed=total_closed,
@@ -490,11 +446,6 @@ def analyse(df, threshold=0.90, month_filter=None):
         monthly_totals=monthly_totals,
         closure_by_value=closure_by_value,
         band_counts=band_counts,
-        backlog_age=dict(
-            overall_median=overall_median_age,
-            overall_avg=overall_avg_age,
-            by_cohort=age_by_cohort,
-        ),
     )
 
 
@@ -537,14 +488,14 @@ def build_insights_csv(d, threshold):
 
 
 def render_dashboard(df):
-    # ── Derive available months from data ─────────────────────────────────────
+    # ── Derive available months from data ─────────────────────────────────────────────
     tmp = normalise_columns(df.drop_duplicates('cluster_id').copy())
     tmp['createcluster'] = pd.to_datetime(tmp['createcluster'])
     tmp = tmp[tmp['createcluster'] >= '2026-01-01']
     available_months = sorted(tmp['createcluster'].dt.to_period('M').dropna().unique())
     month_options    = ['All'] + [m.strftime('%b %Y') for m in available_months]
 
-    # ── Header + controls ─────────────────────────────────────────────────────
+    # ── Header + controls ────────────────────────────────────────────────────────────────
     hcol, scol = st.columns([3, 1])
     with hcol:
         st.markdown("""
@@ -576,7 +527,7 @@ def render_dashboard(df):
     st.session_state.last_insights = build_insights_csv(d, threshold)
     st.session_state.last_insights_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
-    # ── Metrics ───────────────────────────────────────────────────────────────
+    # ── Metrics ──────────────────────────────────────────────────────────────────────────
     period_label  = selected_label if month_filter else 'Jan 2026 onwards'
     backlog_label = f'Open as of end of {selected_label}' if month_filter else 'SuspectedDuplicates only'
     st.markdown(f"""
@@ -720,86 +671,6 @@ def render_dashboard(df):
                     <th style="text-align:right">% of backlog</th>
                 </tr></thead>
                 <tbody>{rows}</tbody>
-            </table>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # ── Backlog age — valuable clusters ───────────────────────────────────────
-    st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-    section_label(f"Backlog age — valuable clusters (score ≥ {threshold:.2f})")
-
-    ba = d['backlog_age']
-    if ba['overall_median'] is None:
-        st.markdown(
-            '<p style="color:#a1a1aa;font-size:0.85rem">No valuable clusters in current backlog.</p>',
-            unsafe_allow_html=True,
-        )
-    else:
-        # Headline metric cards
-        st.markdown(f"""
-        <div class="age-metric-row">
-            <div class="metric-card">
-                <div class="label">Median age — valuable backlog</div>
-                <div class="value">{ba['overall_median']:,}</div>
-                <div class="sub">days</div>
-            </div>
-            <div class="metric-card">
-                <div class="label">Average age — valuable backlog</div>
-                <div class="value">{ba['overall_avg']:,}</div>
-                <div class="sub">days</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Cohort table
-        def age_dot(median_days):
-            if median_days >= 90:   return '#ef4444'   # red
-            if median_days >= 45:   return '#f59e0b'   # amber
-            if median_days >= 15:   return '#3b82f6'   # blue
-            return '#22c55e'                            # green
-
-        ac = ba['by_cohort']
-        total_count  = int(ac['count'].sum())
-        total_oldest = int(ac['oldest'].max())
-        all_ages_med = ba['overall_median']
-        all_ages_avg = ba['overall_avg']
-
-        age_rows = ""
-        for _, row in ac.iterrows():
-            dot   = age_dot(row['median'])
-            label = f'<span class="cohort-dot" style="background:{dot}"></span>{row["month_str"]}'
-            age_rows += (
-                f"<tr>"
-                f"<td style='font-family:Inter,sans-serif'>{label}</td>"
-                f"<td>{row['count']:,}</td>"
-                f"<td>{row['median']:,}</td>"
-                f"<td>{row['mean']:.1f}</td>"
-                f"<td>{row['oldest']:,}</td>"
-                f"</tr>"
-            )
-        total_dot = age_dot(all_ages_med)
-        age_rows += (
-            f"<tr>"
-            f"<td style='font-family:Inter,sans-serif'>"
-            f"<span class='cohort-dot' style='background:{total_dot}'></span>Total</td>"
-            f"<td>{total_count:,}</td>"
-            f"<td>{all_ages_med:,}</td>"
-            f"<td>{all_ages_avg:.1f}</td>"
-            f"<td>{total_oldest:,}</td>"
-            f"</tr>"
-        )
-
-        st.markdown(f"""
-        <div class="tbl-card">
-            <table class="backlog-table">
-                <thead><tr>
-                    <th>Created</th>
-                    <th>Clusters</th>
-                    <th>Median age (days)</th>
-                    <th>Average age (days)</th>
-                    <th>Oldest (days)</th>
-                </tr></thead>
-                <tbody>{age_rows}</tbody>
             </table>
         </div>
         """, unsafe_allow_html=True)
