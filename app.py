@@ -387,14 +387,12 @@ def analyse(df, threshold=0.90, month_filter=None):
     all_clusters['create_month'] = all_clusters['createcluster'].dt.to_period('M')
     all_clusters['close_month']  = all_clusters['terminatingevent'].dt.to_period('M')
 
-    # Created stats scoped to Jan 2026+; closures drawn from all_clusters (any creation date)
-    clusters = all_clusters[all_clusters['createcluster'] >= '2026-01-01'].copy()
+    clusters = all_clusters
 
     closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
     all_closed = all_clusters[
         all_clusters['current_cluster_status'].isin(closed_statuses) &
-        all_clusters['terminatingevent'].notna() &
-        (all_clusters['terminatingevent'] >= '2026-01-01')
+        all_clusters['terminatingevent'].notna()
     ].copy()
     all_closed['close_type'] = all_closed['current_cluster_status'].apply(
         lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
@@ -404,7 +402,7 @@ def analyse(df, threshold=0.90, month_filter=None):
         sel        = month_filter                          # pd.Period
         month_end  = sel.to_timestamp(how='end')          # last instant of month
 
-        total_created  = int((clusters['create_month'] == sel).sum())
+        total_created  = int((all_clusters['create_month'] == sel).sum())
         closed         = all_closed[all_closed['close_month'] == sel].copy()
         total_closed   = len(closed)
         monthly_totals = None                             # chart replaced by stat row
@@ -416,11 +414,11 @@ def analyse(df, threshold=0.90, month_filter=None):
              (all_clusters['terminatingevent'] > month_end))
         ].copy()
     else:
-        total_created = len(clusters)
+        total_created = len(all_clusters)
         closed        = all_closed.copy()
         total_closed  = len(closed)
 
-        monthly_created    = clusters.groupby('create_month').size().reset_index(name='created')
+        monthly_created    = all_clusters.groupby('create_month').size().reset_index(name='created')
         monthly_closed_agg = closed.groupby('close_month').size().reset_index(name='closed')
         monthly_totals = (
             monthly_created.rename(columns={'create_month': 'month'})
@@ -428,7 +426,7 @@ def analyse(df, threshold=0.90, month_filter=None):
                    on='month', how='outer')
             .fillna(0).sort_values('month')
         )
-        monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b')
+        monthly_totals['month_str'] = monthly_totals['month'].dt.strftime('%b %Y')
         monthly_totals['created']   = monthly_totals['created'].astype(int)
         monthly_totals['closed']    = monthly_totals['closed'].astype(int)
 
@@ -492,7 +490,7 @@ def build_insights_csv(d, threshold):
         "",
         "## Summary",
         "Metric,Value",
-        f"Clusters created (Jan 2026+),{d['total_created']}",
+        f"Clusters created (all time),{d['total_created']}",
         f"Closed clusters,{d['total_closed']}",
         f"Open backlog (SuspectedDuplicates),{d['total_backlog']}",
         f"Valuable backlog (score >= {threshold:.2f}),{d['valuable_backlog']}",
@@ -519,7 +517,6 @@ def render_dashboard(df):
     # ── Derive available months from data ─────────────────────────────────────────────
     tmp = normalise_columns(df.drop_duplicates('cluster_id').copy())
     tmp['createcluster'] = pd.to_datetime(tmp['createcluster'])
-    tmp = tmp[tmp['createcluster'] >= '2026-01-01']
     available_months = sorted(tmp['createcluster'].dt.to_period('M').dropna().unique())
     month_options    = ['All'] + [m.strftime('%b %Y') for m in available_months]
 
@@ -529,7 +526,7 @@ def render_dashboard(df):
         st.markdown("""
         <div class="page-header">
             <h1>Cluster Analytics</h1>
-            <span class="subtitle">Jan 2026 onwards</span>
+            <span class="subtitle">All time</span>
         </div>
         """, unsafe_allow_html=True)
     with scol:
@@ -556,7 +553,7 @@ def render_dashboard(df):
     st.session_state.last_insights_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
     # ── Metrics ──────────────────────────────────────────────────────────────────────────
-    period_label  = selected_label if month_filter else 'Jan 2026 onwards'
+    period_label  = selected_label if month_filter else 'All time'
     backlog_label = f'Open as of end of {selected_label}' if month_filter else 'SuspectedDuplicates only'
     st.markdown(f"""
     <div class="metric-row">
@@ -587,13 +584,13 @@ def render_dashboard(df):
     rate_sub = (
         f"of {selected_label} backlog ({d['rate_base']:,} clusters)"
         if month_filter else
-        f"of Jan 2026+ clusters raised ({d['rate_base']:,})"
+        f"of all clusters raised ({d['rate_base']:,})"
     )
     merged_sub = (
-        f"{d['merged_count']:,} merged {'that month' if month_filter else 'Jan 2026+'}"
+        f"{d['merged_count']:,} merged {'that month' if month_filter else 'all time'}"
     )
     nodup_sub = (
-        f"{d['nodup_count']:,} no duplicates {'that month' if month_filter else 'Jan 2026+'}"
+        f"{d['nodup_count']:,} no duplicates {'that month' if month_filter else 'all time'}"
     )
     st.markdown(f"""
     <div class="metric-row-3">
