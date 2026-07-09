@@ -372,13 +372,13 @@ def analyse(df, threshold=0.90, month_filter=None):
 
     clusters = all_clusters
 
-    closed_statuses = ['NoDuplicates', 'Merged', 'MergeBlocked']
+    closed_statuses = ['NoDuplicates', 'Terminated', 'Merged', 'MergeBlocked']
     all_closed = all_clusters[
         all_clusters['current_cluster_status'].isin(closed_statuses) &
         all_clusters['terminatingevent'].notna()
     ].copy()
     all_closed['close_type'] = all_closed['current_cluster_status'].apply(
-        lambda x: 'Merged' if x == 'Merged' else 'NoDuplicates'
+        lambda x: 'Merged' if x == 'Merged' else 'Terminated'
     )
 
     if month_filter is not None:
@@ -422,10 +422,10 @@ def analyse(df, threshold=0.90, month_filter=None):
 
     closed['value_band'] = pd.cut(closed['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
     closure_by_value = closed.groupby(['value_band', 'close_type']).size().unstack(fill_value=0)
-    for col in ['Merged', 'NoDuplicates']:
+    for col in ['Merged', 'Terminated']:
         if col not in closure_by_value.columns:
             closure_by_value[col] = 0
-    closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['NoDuplicates']
+    closure_by_value['total'] = closure_by_value['Merged'] + closure_by_value['Terminated']
 
     total_backlog = len(backlog)
     backlog['band'] = pd.cut(backlog['wk_score_2dp'], bins=BINS, labels=LABELS, right=False)
@@ -433,7 +433,7 @@ def analyse(df, threshold=0.90, month_filter=None):
 
     # ── Conversion metrics ────────────────────────────────────────────
     merged_count = int((closed['close_type'] == 'Merged').sum())
-    nodup_count  = int((closed['close_type'] == 'NoDuplicates').sum())
+    nodup_count  = int((closed['close_type'] == 'Terminated').sum())
     # Denominator: clusters raised (All) or backlog as of month-end (month filter)
     rate_base    = total_backlog if month_filter is not None else total_created
     def pct(n): return round(n / rate_base * 100, 1) if rate_base else 0.0
@@ -576,7 +576,7 @@ def render_dashboard(df):
         f"{d['merged_count']:,} merged {'that month' if month_filter else 'all time'}"
     )
     nodup_sub = (
-        f"{d['nodup_count']:,} no duplicates {'that month' if month_filter else 'all time'}"
+        f"{d['nodup_count']:,} terminated {'that month' if month_filter else 'all time'}"
     )
     st.markdown(f"""
     <div class="metric-row-3">
@@ -591,7 +591,7 @@ def render_dashboard(df):
             <div class="sub">{merged_sub}</div>
         </div>
         <div class="metric-card">
-            <div class="label">No duplicates</div>
+            <div class="label">Terminated</div>
             <div class="value">{d['nodup_pct']:.1f}%</div>
             <div class="sub">{nodup_sub}</div>
         </div>
@@ -653,10 +653,10 @@ def render_dashboard(df):
             hovertemplate='<b>%{y}</b> Merged  %{x:,}<extra></extra>',
         ))
         fig2.add_trace(go.Bar(
-            y=cv.index.astype(str), x=cv['NoDuplicates'],
-            name='No duplicates', orientation='h',
+            y=cv.index.astype(str), x=cv['Terminated'],
+            name='Terminated', orientation='h',
             marker=dict(color="#d4d4d8", line_width=0, cornerradius=4),
-            hovertemplate='<b>%{y}</b> No dup  %{x:,}<extra></extra>',
+            hovertemplate='<b>%{y}</b> Terminated  %{x:,}<extra></extra>',
         ))
         fig2.update_layout(
             **base_layout(legend=True),
